@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{f84cf545-a9fb-4596-ac69-e72f993a07a7}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{f35b99cd-24bc-450c-9d15-ea0015897a95}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx</Extensions>
+    </Filter>
+    <Filter Include="Configuration">
+      <UniqueIdentifier>{fdd0b9ef-da11-42b1-990d-6c8c5d296e38}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Benchmark.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Config.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="main.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="ProcessRunner.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Report.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Utility.cpp"><Filter>Source Files</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Benchmark.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Config.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="CmdArgs.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="ProcessRunner.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Report.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Types.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Utility.h"><Filter>Header Files</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="config.example.txt"><Filter>Configuration</Filter></None>
+    <None Include="config.example.md"><Filter>Configuration</Filter></None>
+    <None Include="README.md"><Filter>Configuration</Filter></None>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,49 @@
+PROCESS BENCHMARK EXAMPLE - TEST 1 VS TEST 2
+
+RUNS: 3
+
+ENGINES
+
+Name    | Executable
+--------|---------------------------------
+EngineA | C:\temp\engines+\EngineA.exe
+EngineB | C:\temp\engines+\EngineB.exe
+EngineC | C:\temp\engines+\EngineC.exe
+
+FILES
+
+Index | File
+------|---------------------------
+0     | C:\temp\CadFiles\factory.fbx
+1     | C:\temp\CadFiles\topside.nwd
+2     | C:\temp\CadFiles\pump.obj
+3     | C:\temp\CadFiles\building.rvm
+
+PROCESSES - TEST 1
+
+Index | Engine  | Command Arguments
+------|---------|--------------------------------------------------------------------------
+0     | EngineA | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
+1     | EngineA | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
+2     | EngineA | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
+3     | EngineB | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
+
+PROCESSES - TEST 2
+
+Index | Engine  | Command Arguments
+------|---------|---------------------------------------------------------------------------------
+0     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
+1     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
+2     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
+3     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
+
+FILE PLACEHOLDERS
+
+Placeholders are inspired by Visual Basic .NET.
+Example file: C:/temp/test.dat
+
+Placeholder | Description                           | Value
+------------|---------------------------------------|----------
+{file.dir}  | Directory, including trailing slash   | C:/temp/
+{file.name} | File name without the final extension | test
+{file.ext}  | Final extension, including the dot    | .dat
