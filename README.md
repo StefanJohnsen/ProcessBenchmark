@@ -71,9 +71,9 @@ ENGINES
 
 Name    | Executable
 --------|---------------------------------
-EngineA | C:\temp\engines+\EngineA.exe
-EngineB | C:\temp\engines+\EngineB.exe
-EngineC | C:\temp\engines+\EngineC.exe
+EngineA | C:\temp\engines\EngineA.exe
+EngineB | C:\temp\engines\EngineB.exe
+EngineC | C:\temp\engines\EngineC.exe
 
 FILES
 
@@ -87,28 +87,28 @@ PROCESSES - TEST 1
 
 Index | Engine  | Command Arguments
 ------|---------|--------------------------------------------------------------------------
-0     | EngineA | {file} C:\temp\Output\Test1\{file.name}.obj -async
-1     | EngineA | {file} C:\temp\Output\Test1\{file.name}.obj -async
-2     | EngineB | {file} C:\temp\Output\Test1\{file.name}.obj -async
+0     | EngineA | {file} C:\temp\Test1\{file.name}.obj -async
+1     | EngineA | {file} C:\temp\Test1\{file.name}.obj -async
+2     | EngineB | {file} C:\temp\Test1\{file.name}.obj -async
 
 PROCESSES - TEST 2
 
 Index | Engine  | Command Arguments
 ------|---------|---------------------------------------------------------------------------------
-0     | EngineC | {file} C:\temp\Output\Test2\{file.name}.obj
-1     | EngineC | {file} C:\temp\Output\Test2\{file.name}.obj
-2     | EngineC | {file} C:\temp\Output\Test2\{file.name}.obj
+0     | EngineC | {file} C:\temp\Test2\{file.name}.obj
+1     | EngineC | {file} C:\temp\Test2\{file.name}.obj
+2     | EngineC | {file} C:\temp\Test2\{file.name}.obj
 ```
 
 For illustration, the configuration above produces the same command lines you might place in a batch file:
 
 ```bat
-C:\temp\engines+\EngineA.exe C:\temp\CadFiles\factory.fbx C:\temp\Output\Test1\factory.obj -async
-C:\temp\engines+\EngineC.exe C:\temp\CadFiles\factory.fbx C:\temp\Output\Test2\factory.obj
-C:\temp\engines+\EngineA.exe C:\temp\CadFiles\platform.fbx C:\temp\Output\Test1\platform.obj -async
-C:\temp\engines+\EngineC.exe C:\temp\CadFiles\platform.fbx C:\temp\Output\Test2\platform.obj
-C:\temp\engines+\EngineB.exe C:\temp\CadFiles\building.rvm C:\temp\Output\Test1\building.obj -async
-C:\temp\engines+\EngineC.exe C:\temp\CadFiles\building.rvm C:\temp\Output\Test2\building.obj
+C:\temp\engines\EngineA.exe C:\temp\CadFiles\factory.fbx C:\temp\Test1\factory.obj -async
+C:\temp\engines\EngineC.exe C:\temp\CadFiles\factory.fbx C:\temp\Test2\factory.obj
+C:\temp\engines\EngineA.exe C:\temp\CadFiles\platform.fbx C:\temp\Test1\platform.obj -async
+C:\temp\engines\EngineC.exe C:\temp\CadFiles\platform.fbx C:\temp\Test2\platform.obj
+C:\temp\engines\EngineB.exe C:\temp\CadFiles\building.rvm C:\temp\Test1\building.obj -async
+C:\temp\engines\EngineC.exe C:\temp\CadFiles\building.rvm C:\temp\Test2\building.obj
 ```
 
 Because `RUNS` is `3`, ProcessBenchmark executes each command line three times. The processes run sequentially in the
