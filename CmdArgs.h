@@ -9,7 +9,10 @@
 
 namespace benchmark::cmd
 {
-inline constexpr char Version[] = "ProcessBenchmark version 0.1.0";
+#define PROCESS_BENCHMARK_VERSION "1.0.0"
+inline constexpr char VersionNumber[] = PROCESS_BENCHMARK_VERSION;
+inline constexpr char Version[] = "ProcessBenchmark version " PROCESS_BENCHMARK_VERSION;
+#undef PROCESS_BENCHMARK_VERSION
 
 struct Arguments final
 {
