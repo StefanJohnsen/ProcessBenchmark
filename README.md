@@ -1,7 +1,30 @@
 # ProcessBenchmark
 
-`ProcessBenchmark` compares exactly two process groups. It runs one Windows process at a time, measures run time
-and RAM usage, and writes a Markdown report. An example report is shown at the end of this README.
+Which process is faster—and how much RAM does it use?
+
+`ProcessBenchmark` runs two groups of command-line processes under the same conditions and turns the measurements
+into a clear, reproducible Markdown report.
+
+- Compare any Windows command-line executables.
+- Use completely flexible command arguments.
+- Measure run time, peak RAM or both.
+- Run processes sequentially to avoid competition between measured processes.
+- Reduce timing noise with repeated runs and median results.
+- Keep the original configuration together with the generated report.
+
+### Example result
+
+**TEST 2 IS 2.07x FASTER**<br>
+**TEST 1 USES 10.0% LESS RAM**
+
+The complete fictional report is shown at the end of this README.
+
+## How it works
+
+1. Define the executables and files used by the test.
+2. Describe exactly two groups of processes to compare.
+3. Run the benchmark. Every process runs sequentially, one at a time.
+4. Open the generated Markdown report and see which group performed best.
 
 ## Build
 
@@ -91,6 +114,20 @@ C:\temp\engines+\EngineC.exe C:\temp\CadFiles\building.rvm C:\temp\Output\Test2\
 Because `RUNS` is `3`, ProcessBenchmark executes each command line three times. The processes run sequentially in the
 order shown: Test 1 followed by Test 2 for each file.
 
+## Run the benchmark
+
+Give ProcessBenchmark the absolute path to your configuration file:
+
+```bat
+ProcessBenchmark.exe "C:\Benchmark\testProcess.txt"
+```
+
+The report is written beside the configuration file with the same base name. In this example, the report is
+`C:\Benchmark\testProcess.md`.
+
+Use `--time-only` or `--ram-only` to measure one metric, or run `ProcessBenchmark.exe -help` to see all available
+options.
+
 ## Report and measurements
 
 The example report below shows the complete generated output, including hardware information, processes, measurements
@@ -98,8 +135,12 @@ and comparisons. Regular report tables hide directory paths to make the results 
 `Configuration Used` section preserves the original configuration so the benchmark can be reproduced without having
 to archive every configuration file separately.
 
+### Measurement details
+
 Run time uses `std::chrono::steady_clock`. RAM is the direct process `PeakWorkingSetSize`; child-process memory
 and GPU/VRAM are excluded. Per-file comparisons use the median. Use `--time-only` or `--ram-only` for one metric.
+
+### Windows memory APIs
 
 The memory implementation follows Microsoft's Windows API documentation:
 
@@ -111,6 +152,8 @@ The memory implementation follows Microsoft's Windows API documentation:
   supplies usable and available physical memory, page-file limit, and memory load.
 - [`GetPhysicallyInstalledSystemMemory`](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getphysicallyinstalledsystemmemory)
   supplies physically installed RAM from SMBIOS.
+
+### Exit codes
 
 Exit codes: `0` success, `1` usage/configuration/preflight/report error, `2` completed with failed runs or no comparison.
 
