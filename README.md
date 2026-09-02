@@ -1,7 +1,7 @@
 # ProcessBenchmark
 
 `ProcessBenchmark` compares exactly two process groups. It runs one Windows process at a time, measures run time
-and peak RAM, and writes a Markdown report beside the text configuration (`benchmark.txt` becomes `benchmark.md`).
+and RAM usage, and writes a Markdown report. An example report is shown at the end of this README.
 
 ## Build and usage
 
@@ -14,265 +14,55 @@ Run `ProcessBenchmark.exe -help` for the authoritative option list. Benchmark op
 leading dashes. Unknown options, duplicate measurement options, incompatible measurement modes, and combinations
 with `-help` or `-version` are rejected before the configuration is loaded.
 
-All executable, input, output, and configuration paths must be absolute. The report uses the same directory and base
-name as the configuration, replacing `.txt` with `.md` (`C:\Benchmark\config.txt` becomes
-`C:\Benchmark\config.md`). See [`config.example.txt`](config.example.txt) and the fictional generated-style
-[`config.example.md`](config.example.md).
+Use absolute paths for the configuration file, executables and files listed under `FILES`.
 
-## Configuration contract
+Example command in Command Prompt or a batch file:
 
-- The first non-empty line is the report title; `RUNS` must be between 1 and 100.
-- `ENGINES` maps unique names to existing executables.
-- `FILES` contains ordered inputs with consecutive indices starting at zero.
-- Exactly two `PROCESSES` groups are required, each with one row per input in identical index order.
-- A process names an engine and supplies complete Visual Studio-style Command Arguments.
-- `{file.dir}`, `{file.name}`, and `{file.ext}` expand from the matching input.
-- The first absolute file argument must be that input; the second is the expected output.
+```bat
+ProcessBenchmark.exe "C:\Benchmark\config.txt"
+```
 
-The exact expected output is removed before every run. Success requires process exit code zero and a non-empty output.
+The report is created in the same directory with the same base name:
 
-## Report and measurements
+```text
+Configuration: C:\Benchmark\config.txt
+Report:        C:\Benchmark\config.md
+```
 
-The report includes CPU, core and logical processor counts, clock, installed/usable/available memory, page-file limit,
-memory load, architecture, engines, files, and expanded processes. Normal report tables show file arguments and
-executables only as filenames with extensions. The final `Configuration Used` appendix intentionally preserves the
-complete ASCII input configuration, including full paths and placeholders, so the benchmark can be reproduced.
-
-Run time uses `std::chrono::steady_clock`. Peak RAM is the direct process `PeakWorkingSetSize`; child-process memory
-and GPU/VRAM are excluded. Per-file comparisons use the median. Use `--time-only` or `--ram-only` for one metric.
-
-The memory implementation follows Microsoft's Windows API documentation:
-
-- [`GetProcessMemoryInfo`](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo)
-  reads process memory statistics.
-- [`PROCESS_MEMORY_COUNTERS_EX.PeakWorkingSetSize`](https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex)
-  supplies the converter's peak physical working set.
-- [`GlobalMemoryStatusEx`](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex)
-  supplies usable and available physical memory, page-file limit, and memory load.
-- [`GetPhysicallyInstalledSystemMemory`](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getphysicallyinstalledsystemmemory)
-  supplies physically installed RAM from SMBIOS.
-
-Exit codes: `0` success, `1` usage/configuration/preflight/report error, `2` completed with failed runs or no comparison.
+See [`config.example.txt`](config.example.txt) for a complete configuration. A fictional generated report is shown
+at the end of this README and is also available as [`config.example.md`](config.example.md).
 
 <br>
-
-# Example Output
-
-The complete example is also available as [`config.example.md`](config.example.md).
-
----
-
-# PROCESS BENCHMARK EXAMPLE - TEST 1 VS TEST 2
-
-> **Example report with fictional measurements.**
-
-## Test System
-
-| Component | Value |
-|---|---|
-| CPU | Example 12-Core Processor |
-| CPU vendor | ExampleVendor |
-| Physical cores | 12 |
-| Logical processors | 24 |
-| Reported CPU clock | 3600 MHz |
-| Installed memory | 64.00 GiB |
-| Usable physical memory | 63.75 GiB |
-| Available physical memory at report time | 48.20 GiB |
-| Total page file limit | 73.75 GiB |
-| Memory load at report time | 24% |
-| Native architecture | x64 |
-
-Memory values are collected with Microsoft's Windows APIs: [GetPhysicallyInstalledSystemMemory](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getphysicallyinstalledsystemmemory) and [GlobalMemoryStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex).
-
-## Benchmark Overview
-
-This benchmark compares **2 process groups** across **4 input files**. Each configured process is run **3 times** for each group, for a total of **24 planned process runs**. Processes execute sequentially, one at a time, so they do not compete with another tested process for CPU or memory during measurement.
-
-## Engines
-
-| Name | Executable |
-|---|---|
-| EngineA | `EngineA.exe` |
-| EngineB | `EngineB.exe` |
-| EngineC | `EngineC.exe` |
-
-## Files
-
-| Index | File | Input size |
-|---:|---|---:|
-| 0 | `factory.fbx` | 182.40 MiB |
-| 1 | `topside.nwd` | 1.34 GiB |
-| 2 | `pump.obj` | 48.75 MiB |
-| 3 | `building.rvm` | 612.30 MiB |
-
-## Processes - Test 1
-
-| Index | Engine | Command Arguments |
-|---:|---|---|
-| 0 | EngineA | `factory.fbx factory.obj -async` |
-| 1 | EngineA | `topside.nwd topside.obj -async` |
-| 2 | EngineA | `pump.obj pump.obj -async` |
-| 3 | EngineB | `building.rvm building.obj -async` |
-
-## Processes - Test 2
-
-| Index | Engine | Command Arguments |
-|---:|---|---|
-| 0 | EngineC | `factory.fbx factory.obj` |
-| 1 | EngineC | `topside.nwd topside.obj` |
-| 2 | EngineC | `pump.obj pump.obj` |
-| 3 | EngineC | `building.rvm building.obj` |
-
-## Test Method
-
-- Conversions run sequentially, one process at a time.
-- Per-file results are medians of three runs. A file is compared only when all runs succeed for both groups.
-- Type and overall run times are sums of comparable per-file medians.
-- Type and overall memory values are the highest comparable per-file medians; memory is not summed.
-
 <br>
 
-### Run Time Measurement
+# Configuration
 
-Run time uses a monotonic clock from immediately before the suspended process is resumed until it terminates. Executable initialization and output writing are included.
+Copy the ASCII [`config.example.txt`](config.example.txt) file, give the copy a descriptive name for your test, and
+adapt it to the processes you want to benchmark. For example, rename it to `testProcess.txt`. The configuration
+tells ProcessBenchmark what to run:
 
-<br>
+1. Write the report title on the first line.
+2. Set `RUNS` to the number of repetitions, from 1 to 100. Using 3 to 5 runs is recommended for most benchmarks.
+   Repeated runs reduce the influence of a cold first start, system activity and temporary timing variations. The
+   report uses the median result, so one unusually slow or fast run has less influence on the comparison.
+3. Under `ENGINES`, add as many process engines as needed. Give each executable a short name and its absolute path.
+4. Under `FILES`, add as many test files as needed, using consecutive indices starting at `0`.
+5. Add exactly two `PROCESSES` groups. Give every input file one process row in each group, using the same indices.
 
-### Memory Measurement
+Each process row contains an index, an engine name and `Command Arguments`. Its index connects the row to the `FILES`
+entry with the same index. `Command Arguments` is free text and may contain any arguments, options, flags or paths
+accepted by the selected process. It may also be empty. File placeholders are optional. ProcessBenchmark replaces
+placeholders when present, then passes the complete expanded string directly to the executable without interpreting
+or rearranging its contents. Use double quotes when an individual argument contains spaces.
 
-Peak RAM is read with Microsoft's [GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo). `PeakWorkingSetSize` is the highest resident physical working set reported for the direct process. See [PROCESS_MEMORY_COUNTERS_EX](https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex).
+The matching `FILES` entry is the file identity used for measurements and report comparisons. It does not impose a
+particular position or role on the process's command arguments.
 
-<br>
+ProcessBenchmark does not identify, create, validate or delete output files. A process may have no output argument at
+all. If your process requires an output path not to exist, remove old output yourself before starting the benchmark.
+A run succeeds when the process starts correctly, enabled measurements succeed and the process returns exit code `0`.
 
-## File type `.fbx`
-
-<br>
-
-### Per-file results
-
-| File | Extension | Input size | Test 1 run time | Test 2 run time | Run time comparison | Test 1 peak RAM | Test 2 peak RAM | Memory comparison | Status |
-|---|---|---:|---:|---:|---|---:|---:|---|---|
-| `factory` | `fbx` | 182.40 MiB | 00:20.000 | 00:09.524 | Test 2: 52.4% lower (2.10x speedup) | 700.0 MiB | 770.0 MiB | Test 1: 9.1% less peak RAM | Comparable |
-
-<br>
-
-### Individual runs
-
-| File | Group | Run | Order | Run time | Peak RAM | Output | Exit | Status |
-|---|---|---:|---:|---:|---:|---:|---:|---|
-| `factory.fbx` | Test 1 | 1 | 1 | 00:20.120 | 699.0 MiB | 96.20 MiB | 0 | OK |
-| `factory.fbx` | Test 1 | 2 | 2 | 00:20.000 | 700.0 MiB | 96.20 MiB | 0 | OK |
-| `factory.fbx` | Test 1 | 3 | 3 | 00:19.930 | 701.0 MiB | 96.20 MiB | 0 | OK |
-| `factory.fbx` | Test 2 | 1 | 4 | 00:09.600 | 768.0 MiB | 96.20 MiB | 0 | OK |
-| `factory.fbx` | Test 2 | 2 | 5 | 00:09.524 | 770.0 MiB | 96.20 MiB | 0 | OK |
-| `factory.fbx` | Test 2 | 3 | 6 | 00:09.480 | 772.0 MiB | 96.20 MiB | 0 | OK |
-
-<br>
-
-## File type `.nwd`
-
-<br>
-
-### Per-file results
-
-| File | Extension | Input size | Test 1 run time | Test 2 run time | Run time comparison | Test 1 peak RAM | Test 2 peak RAM | Memory comparison | Status |
-|---|---|---:|---:|---:|---|---:|---:|---|---|
-| `topside` | `nwd` | 1.34 GiB | 00:21.000 | 00:10.000 | Test 2: 52.4% lower (2.10x speedup) | 680.0 MiB | 760.0 MiB | Test 1: 10.5% less peak RAM | Comparable |
-
-<br>
-
-### Individual runs
-
-| File | Group | Run | Order | Run time | Peak RAM | Output | Exit | Status |
-|---|---|---:|---:|---:|---:|---:|---:|---|
-| `topside.nwd` | Test 1 | 1 | 7 | 00:21.140 | 681.0 MiB | 410.50 MiB | 0 | OK |
-| `topside.nwd` | Test 1 | 2 | 8 | 00:21.000 | 680.0 MiB | 410.50 MiB | 0 | OK |
-| `topside.nwd` | Test 1 | 3 | 9 | 00:20.910 | 679.0 MiB | 410.50 MiB | 0 | OK |
-| `topside.nwd` | Test 2 | 1 | 10 | 00:10.080 | 762.0 MiB | 410.50 MiB | 0 | OK |
-| `topside.nwd` | Test 2 | 2 | 11 | 00:10.000 | 760.0 MiB | 410.50 MiB | 0 | OK |
-| `topside.nwd` | Test 2 | 3 | 12 | 00:09.940 | 758.0 MiB | 410.50 MiB | 0 | OK |
-
-<br>
-
-## File type `.obj`
-
-<br>
-
-### Per-file results
-
-| File | Extension | Input size | Test 1 run time | Test 2 run time | Run time comparison | Test 1 peak RAM | Test 2 peak RAM | Memory comparison | Status |
-|---|---|---:|---:|---:|---|---:|---:|---|---|
-| `pump` | `obj` | 48.75 MiB | 00:20.500 | 00:09.800 | Test 2: 52.2% lower (2.09x speedup) | 690.0 MiB | 780.0 MiB | Test 1: 11.5% less peak RAM | Comparable |
-
-<br>
-
-### Individual runs
-
-| File | Group | Run | Order | Run time | Peak RAM | Output | Exit | Status |
-|---|---|---:|---:|---:|---:|---:|---:|---|
-| `pump.obj` | Test 1 | 1 | 13 | 00:20.620 | 688.0 MiB | 30.40 MiB | 0 | OK |
-| `pump.obj` | Test 1 | 2 | 14 | 00:20.500 | 690.0 MiB | 30.40 MiB | 0 | OK |
-| `pump.obj` | Test 1 | 3 | 15 | 00:20.410 | 692.0 MiB | 30.40 MiB | 0 | OK |
-| `pump.obj` | Test 2 | 1 | 16 | 00:09.880 | 782.0 MiB | 30.40 MiB | 0 | OK |
-| `pump.obj` | Test 2 | 2 | 17 | 00:09.800 | 780.0 MiB | 30.40 MiB | 0 | OK |
-| `pump.obj` | Test 2 | 3 | 18 | 00:09.740 | 778.0 MiB | 30.40 MiB | 0 | OK |
-
-<br>
-
-## File type `.rvm`
-
-<br>
-
-### Per-file results
-
-| File | Extension | Input size | Test 1 run time | Test 2 run time | Run time comparison | Test 1 peak RAM | Test 2 peak RAM | Memory comparison | Status |
-|---|---|---:|---:|---:|---|---:|---:|---|---|
-| `building` | `rvm` | 612.30 MiB | 00:21.500 | 00:10.200 | Test 2: 52.6% lower (2.11x speedup) | 720.0 MiB | 800.0 MiB | Test 1: 10.0% less peak RAM | Comparable |
-
-<br>
-
-### Individual runs
-
-| File | Group | Run | Order | Run time | Peak RAM | Output | Exit | Status |
-|---|---|---:|---:|---:|---:|---:|---:|---|
-| `building.rvm` | Test 1 | 1 | 19 | 00:21.610 | 718.0 MiB | 201.80 MiB | 0 | OK |
-| `building.rvm` | Test 1 | 2 | 20 | 00:21.500 | 720.0 MiB | 201.80 MiB | 0 | OK |
-| `building.rvm` | Test 1 | 3 | 21 | 00:21.420 | 722.0 MiB | 201.80 MiB | 0 | OK |
-| `building.rvm` | Test 2 | 1 | 22 | 00:10.280 | 802.0 MiB | 201.80 MiB | 0 | OK |
-| `building.rvm` | Test 2 | 2 | 23 | 00:10.200 | 800.0 MiB | 201.80 MiB | 0 | OK |
-| `building.rvm` | Test 2 | 3 | 24 | 00:10.140 | 798.0 MiB | 201.80 MiB | 0 | OK |
-
-<br>
-
-# Overall Performance
-
-Comparable files: **4/4**
-
-| Metric | Test 1 | Test 2 | Comparison |
-|---|---:|---:|---|
-| Total run time | 01:23.000 | 00:39.524 | Test 2: 52.4% lower run time (2.10x speedup) |
-| Highest median peak RAM | 720.0 MiB | 800.0 MiB | Test 1: 10.0% less peak RAM |
-
-<p><strong>TEST 2 IS 2.10x FASTER</strong></p>
-
-<p><strong>TEST 1 USES 10.0% LESS PEAK RAM</strong></p>
-
-<br>
-
-## Visual Comparison
-
-Lower is better. Bars are normalized independently for each metric.
-
-| Metric | Group | Usage | Value | Comp. | BEST |
-|---|---|---|---:|---:|:---:|
-| Total run time | Test 1 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608; | 01:23.000 | - |  |
-| Total run time | Test 2 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617; | 00:39.524 | 2.10x | **x** |
-| Highest median peak RAM | Test 1 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9617;&#9617; | 720.0 MiB | 10.0% less | **x** |
-| Highest median peak RAM | Test 2 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608; | 800.0 MiB | - |  |
-
-<br>
-
-# Configuration Used
+### Example configuration
 
 ```text
 PROCESS BENCHMARK EXAMPLE - TEST 1 VS TEST 2
@@ -292,42 +82,223 @@ FILES
 Index | File
 ------|---------------------------
 0     | C:\temp\CadFiles\factory.fbx
-1     | C:\temp\CadFiles\topside.nwd
-2     | C:\temp\CadFiles\pump.obj
-3     | C:\temp\CadFiles\building.rvm
+1     | C:\temp\CadFiles\platform.fbx
+2     | C:\temp\CadFiles\building.rvm
 
 PROCESSES - TEST 1
 
 Index | Engine  | Command Arguments
 ------|---------|--------------------------------------------------------------------------
-0     | EngineA | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
-1     | EngineA | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
-2     | EngineA | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
-3     | EngineB | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test1\{file.name}.obj" -async
+0     | EngineA | {file} C:\temp\Output\Test1\{file.name}.obj -async
+1     | EngineA | {file} C:\temp\Output\Test1\{file.name}.obj -async
+2     | EngineB | {file} C:\temp\Output\Test1\{file.name}.obj -async
 
 PROCESSES - TEST 2
 
 Index | Engine  | Command Arguments
 ------|---------|---------------------------------------------------------------------------------
-0     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
-1     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
-2     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
-3     | EngineC | "{file.dir}{file.name}{file.ext}" "C:\temp\Output\Test2\{file.name}.obj"
-
-FILE PLACEHOLDERS
-
-Placeholders are inspired by Visual Basic .NET.
-Example file: C:/temp/test.dat
-
-Placeholder | Description                           | Value
-------------|---------------------------------------|----------
-{file.dir}  | Directory, including trailing slash   | C:/temp/
-{file.name} | File name without the final extension | test
-{file.ext}  | Final extension, including the dot    | .dat
+0     | EngineC | {file} C:\temp\Output\Test2\{file.name}.obj
+1     | EngineC | {file} C:\temp\Output\Test2\{file.name}.obj
+2     | EngineC | {file} C:\temp\Output\Test2\{file.name}.obj
 ```
+
+For illustration, the configuration above produces the same command lines you might place in a batch file:
+
+```bat
+C:\temp\engines+\EngineA.exe C:\temp\CadFiles\factory.fbx C:\temp\Output\Test1\factory.obj -async
+C:\temp\engines+\EngineC.exe C:\temp\CadFiles\factory.fbx C:\temp\Output\Test2\factory.obj
+C:\temp\engines+\EngineA.exe C:\temp\CadFiles\platform.fbx C:\temp\Output\Test1\platform.obj -async
+C:\temp\engines+\EngineC.exe C:\temp\CadFiles\platform.fbx C:\temp\Output\Test2\platform.obj
+C:\temp\engines+\EngineB.exe C:\temp\CadFiles\building.rvm C:\temp\Output\Test1\building.obj -async
+C:\temp\engines+\EngineC.exe C:\temp\CadFiles\building.rvm C:\temp\Output\Test2\building.obj
+```
+
+Because `RUNS` is `3`, ProcessBenchmark executes each command line three times. The processes run sequentially in the
+order shown: Test 1 followed by Test 2 for each file.
+
+## Report and measurements
+
+The example report below shows the complete generated output, including hardware information, processes, measurements
+and comparisons. Regular report tables hide directory paths to make the results easier to read. The final
+`Configuration Used` section preserves the original configuration so the benchmark can be reproduced without having
+to archive every configuration file separately.
+
+Run time uses `std::chrono::steady_clock`. RAM is the direct process `PeakWorkingSetSize`; child-process memory
+and GPU/VRAM are excluded. Per-file comparisons use the median. Use `--time-only` or `--ram-only` for one metric.
+
+The memory implementation follows Microsoft's Windows API documentation:
+
+- [`GetProcessMemoryInfo`](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo)
+  reads process memory statistics.
+- [`PROCESS_MEMORY_COUNTERS_EX.PeakWorkingSetSize`](https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex)
+  supplies the process's highest physical working set.
+- [`GlobalMemoryStatusEx`](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex)
+  supplies usable and available physical memory, page-file limit, and memory load.
+- [`GetPhysicallyInstalledSystemMemory`](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getphysicallyinstalledsystemmemory)
+  supplies physically installed RAM from SMBIOS.
+
+Exit codes: `0` success, `1` usage/configuration/preflight/report error, `2` completed with failed runs or no comparison.
 
 <br>
 
-# License
+# Example Output
 
-ProcessBenchmark is released under the [MIT License](LICENSE).
+> **Example report with fictional measurements.**
+
+# PROCESS BENCHMARK EXAMPLE - TEST 1 VS TEST 2
+
+### **TEST 2 IS 2.07x FASTER**
+
+### **TEST 1 USES 10.0% LESS RAM**
+
+<br>
+
+## Benchmark Hardware
+
+| Component | Value |
+|---|---|
+| CPU | Example 12-Core Processor |
+| CPU vendor | ExampleVendor |
+| Physical cores | 12 |
+| Logical processors | 24 |
+| Reported CPU clock | 3600 MHz |
+| Installed memory | 64 GiB |
+| Usable physical memory | 64 GiB |
+| Available physical memory at report time | 48 GiB |
+| Total page file limit | 74 GiB |
+| Memory load at report time | 24% |
+| Native architecture | x64 |
+
+Memory values are collected with Microsoft's Windows APIs: [GetPhysicallyInstalledSystemMemory](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getphysicallyinstalledsystemmemory) and [GlobalMemoryStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex).
+
+## Benchmark Overview
+
+This benchmark compares **2 process groups** across **3 input files**. Each configured process is run **3 times** for each group, for a total of **18 planned process runs**. Processes execute sequentially, one at a time, so they do not compete with another tested process for CPU or memory during measurement.
+
+## Process Engines
+
+| Name | Executable |
+|---|---|
+| EngineA | `EngineA.exe` |
+| EngineB | `EngineB.exe` |
+| EngineC | `EngineC.exe` |
+
+## Test Files
+
+| Index | File | Size |
+|---:|---|---:|
+| 0 | `factory.fbx` | 210.0 MiB |
+| 1 | `platform.fbx` | 1.2 GiB |
+| 2 | `building.rvm` | 612.0 MiB |
+
+## Processes - Test 1
+
+| Index | Engine | Command Arguments |
+|---:|---|---|
+| 0 | EngineA | `factory.fbx factory.obj -async` |
+| 1 | EngineA | `platform.fbx platform.obj -async` |
+| 2 | EngineB | `building.rvm building.obj -async` |
+
+## Processes - Test 2
+
+| Index | Engine | Command Arguments |
+|---:|---|---|
+| 0 | EngineC | `factory.fbx factory.obj` |
+| 1 | EngineC | `platform.fbx platform.obj` |
+| 2 | EngineC | `building.rvm building.obj` |
+
+## Test Method
+
+- Conversions run sequentially, one process at a time.
+- Per-file results are medians of three runs. A file is compared only when all runs succeed for both groups.
+- Type and overall run times are sums of comparable per-file medians.
+- Type and overall memory values are the highest comparable per-file medians; memory is not summed.
+
+<br>
+
+### Run Time Measurement
+
+Run time uses a monotonic clock from immediately before the suspended process is resumed until it terminates. Executable initialization and output writing are included.
+
+<br>
+
+### Memory Measurement
+
+RAM columns in result tables show the highest resident physical memory usage. It is read with Microsoft's [GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo). `PeakWorkingSetSize` is the highest resident physical working set reported for the direct process. See [PROCESS_MEMORY_COUNTERS_EX](https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex).
+
+<br>
+
+## File type `.fbx`
+
+<br>
+
+### Per-file results
+
+| File name | Ext | Test 1 time | Test 2 time | Time comp. | Test 1 RAM | Test 2 RAM | RAM comp. | Status |
+|---|:---:|:---:|:---:|---|---:|---:|---|:---:|
+| `factory` | `fbx` | 00:20.000 | **00:09.524** | Test 2: 2.10x faster | **700 MiB** | 770 MiB | Test 1: 9.1% less | OK |
+| `platform` | `fbx` | 00:24.300 | **00:12.000** | Test 2: 2.03x faster | **710 MiB** | 790 MiB | Test 1: 10.1% less | OK |
+
+<br>
+
+### Individual runs
+
+| File name | Ext | Group | Run | Time | RAM | Exit | Status | Best |
+|---|:---:|:---:|:---:|:---:|---:|:---:|:---:|:---:|
+| **`factory`** | **`fbx`** | **Test 1** | **1** | 00:20.120 | **699 MiB** | 0 | OK | &#128994; |
+| `factory` | `fbx` | Test 1 | 2 | 00:20.000 | 700 MiB | 0 | OK | |
+| `factory` | `fbx` | Test 1 | 3 | 00:19.930 | 701 MiB | 0 | OK | |
+| `factory` | `fbx` | Test 2 | 1 | 00:09.600 | 768 MiB | 0 | OK | |
+| `factory` | `fbx` | Test 2 | 2 | 00:09.524 | 770 MiB | 0 | OK | |
+| **`factory`** | **`fbx`** | **Test 2** | **3** | **00:09.480** | 772 MiB | 0 | OK | &#128994; |
+| `platform` | `fbx` | Test 1 | 1 | 00:24.480 | 708 MiB | 0 | OK | |
+| `platform` | `fbx` | Test 1 | 2 | 00:24.300 | 710 MiB | 0 | OK | |
+| `platform` | `fbx` | Test 1 | 3 | 00:24.160 | 712 MiB | 0 | OK | |
+| `platform` | `fbx` | Test 2 | 1 | 00:12.140 | 788 MiB | 0 | OK | |
+| `platform` | `fbx` | Test 2 | 2 | 00:12.000 | 790 MiB | 0 | OK | |
+| `platform` | `fbx` | Test 2 | 3 | 00:11.920 | 792 MiB | 0 | OK | |
+
+<br>
+
+## File type `.rvm`
+
+<br>
+
+### Per-file results
+
+| File name | Ext | Test 1 time | Test 2 time | Time comp. | Test 1 RAM | Test 2 RAM | RAM comp. | Status |
+|---|:---:|:---:|:---:|---|---:|---:|---|:---:|
+| `building` | `rvm` | 00:18.600 | **00:08.900** | Test 2: 2.09x faster | **720 MiB** | 800 MiB | Test 1: 10.0% less | OK |
+
+<br>
+
+### Individual runs
+
+| File name | Ext | Group | Run | Time | RAM | Exit | Status | Best |
+|---|:---:|:---:|:---:|:---:|---:|:---:|:---:|:---:|
+| **`building`** | **`rvm`** | **Test 1** | **1** | 00:18.740 | **718 MiB** | 0 | OK | &#128994; |
+| `building` | `rvm` | Test 1 | 2 | 00:18.600 | 720 MiB | 0 | OK | |
+| `building` | `rvm` | Test 1 | 3 | 00:18.510 | 722 MiB | 0 | OK | |
+| `building` | `rvm` | Test 2 | 1 | 00:09.020 | 802 MiB | 0 | OK | |
+| `building` | `rvm` | Test 2 | 2 | 00:08.900 | 800 MiB | 0 | OK | |
+| **`building`** | **`rvm`** | **Test 2** | **3** | **00:08.830** | 798 MiB | 0 | OK | &#128994; |
+
+<br>
+<br>
+
+# Overall Performance
+
+Comparable files: **3/3**
+
+Lower is better. Bars are normalized independently for each metric.
+
+| Metric | Group | Usage | Value | Comp. | BEST |
+|---|---|---|---:|---:|:---:|
+| Total time | Test 1 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608; | 01:02.900 | - |  |
+| Total time | Test 2 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617;&#9617; | 00:30.424 | 2.07x | &#128994; |
+| Highest median RAM | Test 1 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9617;&#9617; | 720 MiB | 10.0% less | &#128994; |
+| Highest median RAM | Test 2 | &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608; | 800 MiB | - |  |
+
+### **TEST 2 IS 2.07x FASTER**
+
+### **TEST 1 USES 10.0% LESS RAM**

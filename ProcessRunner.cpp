@@ -179,15 +179,13 @@ static std::wstring buildCommandLine(const std::filesystem::path& executable, co
 }
 } // namespace
 
-RunResult runConverter(const std::filesystem::path& executable, const std::filesystem::path& input,
-                       const std::filesystem::path& output, const std::string& commandArguments,
-                       const std::filesystem::path& logFile, const size_t runNumber, const size_t executionOrder,
-                       const BenchmarkOptions& options)
+RunResult runConverter(const std::filesystem::path& executable, const std::string& commandArguments,
+                       const std::filesystem::path& logFile, const size_t runNumber,
+                       const size_t executionOrder, const BenchmarkOptions& options)
 {
     RunResult result;
     result.runNumber = runNumber;
     result.executionOrder = executionOrder;
-    result.outputFile = output;
     result.logFile = logFile;
 
     SECURITY_ATTRIBUTES security{};
@@ -198,7 +196,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
                                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (!log.valid())
     {
-        result.error = "Could not create converter log: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not create process log: " + windowsErrorMessage(GetLastError());
         return result;
     }
 
@@ -236,7 +234,6 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
     startup.StartupInfo.hStdError = log.get();
     startup.lpAttributeList = attributes.get();
 
-    static_cast<void>(input);
     auto commandLine = buildCommandLine(executable, commandArguments);
     std::vector<wchar_t> commandBuffer(commandLine.begin(), commandLine.end());
     commandBuffer.push_back(L'\0');
@@ -248,7 +245,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
                        executable.parent_path().c_str(), &startup.StartupInfo, &processInformation);
     if (!created)
     {
-        result.error = "Could not start converter: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not start process: " + windowsErrorMessage(GetLastError());
         return result;
     }
 
@@ -262,7 +259,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
         const auto error = GetLastError();
         TerminateProcess(process.get(), error);
         WaitForSingleObject(process.get(), INFINITE);
-        result.error = "Could not assign converter to the process job: " + windowsErrorMessage(error);
+        result.error = "Could not assign process to the process job: " + windowsErrorMessage(error);
         return result;
     }
 
@@ -272,7 +269,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
         const auto error = GetLastError();
         TerminateJobObject(job.get(), error);
         WaitForSingleObject(process.get(), INFINITE);
-        result.error = "Could not resume converter process: " + windowsErrorMessage(error);
+        result.error = "Could not resume process: " + windowsErrorMessage(error);
         return result;
     }
     thread.reset();
@@ -295,7 +292,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
         const auto error = GetLastError();
         TerminateJobObject(job.get(), error);
         WaitForSingleObject(process.get(), INFINITE);
-        appendError(result, "Could not wait for converter process: " + windowsErrorMessage(error));
+        appendError(result, "Could not wait for process: " + windowsErrorMessage(error));
         break;
     }
 
@@ -309,36 +306,21 @@ RunResult runConverter(const std::filesystem::path& executable, const std::files
     if (GetExitCodeProcess(process.get(), &exitCode))
         result.exitCode = exitCode;
     else
-        appendError(result, "Could not read converter exit code: " + windowsErrorMessage(GetLastError()));
+        appendError(result, "Could not read process exit code: " + windowsErrorMessage(GetLastError()));
 
     if (!waitForJobToBecomeEmpty(job.get()))
     {
         TerminateJobObject(job.get(), ERROR_PROCESS_ABORTED);
-        appendError(result, "Converter left child processes running or job accounting failed.");
+        appendError(result, "Process left child processes running or job accounting failed.");
     }
 
     if (options.measureMemory && !sampledMemory)
-        appendError(result, "Could not measure converter memory usage.");
-
-    std::error_code fileError;
-    if (!std::filesystem::is_regular_file(output, fileError) || fileError)
-    {
-        appendError(result, "Expected output file was not created.");
-    }
-    else
-    {
-        result.outputBytes = std::filesystem::file_size(output, fileError);
-        if (fileError)
-            appendError(result, "Could not read output file size: " + fileError.message());
-        else if (result.outputBytes == 0)
-            appendError(result, "Expected output file is empty.");
-    }
+        appendError(result, "Could not measure process memory usage.");
 
     if (result.exitCode.has_value() && result.exitCode.value() != 0)
-        appendError(result, "Converter exited with code " + std::to_string(result.exitCode.value()) + ".");
+        appendError(result, "Process exited with code " + std::to_string(result.exitCode.value()) + ".");
 
-    result.success =
-        result.error.empty() && result.exitCode.has_value() && result.exitCode.value() == 0 && result.outputBytes > 0;
+    result.success = result.error.empty() && result.exitCode.has_value() && result.exitCode.value() == 0;
     return result;
 }
 } // namespace benchmark

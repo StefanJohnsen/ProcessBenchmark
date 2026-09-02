@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
-#include <set>
 #include <stdexcept>
 #include <system_error>
 #include <vector>
@@ -27,66 +26,6 @@ static void createDirectory(const std::filesystem::path& path, const std::string
         throw std::runtime_error(description + " is not a directory: " + pathToUtf8(path));
 }
 
-static void createOutputDirectories(const Config& config, const std::filesystem::path& logDirectory)
-{
-    for (const auto& group : config.groups)
-        for (const auto& process : group.processes)
-            createDirectory(process.output.parent_path(), "output directory");
-    createDirectory(logDirectory, "converter log directory");
-}
-
-static size_t clearStartupOutputs(const Config& config, const std::filesystem::path& reportPath)
-{
-    const std::vector<std::filesystem::path> protectedFiles = {config.configPath, reportPath};
-    std::set<std::wstring> cleanedFiles;
-    size_t deleted = 0;
-    for (const auto& group : config.groups)
-    {
-        for (const auto& process : group.processes)
-        {
-            if (!cleanedFiles.emplace(normalizedPathKey(process.output)).second) continue;
-            if (std::any_of(protectedFiles.begin(), protectedFiles.end(), [&](const auto& path) { return samePath(path, process.output); }))
-                throw std::runtime_error("An output file must not overwrite the configuration or report.");
-            if (std::any_of(config.files.begin(), config.files.end(), [&](const auto& path) { return samePath(path, process.output); }))
-                throw std::runtime_error("An output file must not overwrite an input file: " + pathToUtf8(process.output));
-            std::error_code error;
-            const auto status = std::filesystem::symlink_status(process.output, error);
-            if (error == std::errc::no_such_file_or_directory || status.type() == std::filesystem::file_type::not_found) continue;
-            if (error) throw std::runtime_error("Could not inspect output file: " + error.message());
-            if (std::filesystem::is_symlink(status) || !std::filesystem::is_regular_file(status))
-                throw std::runtime_error("Refusing to delete a non-regular output: " + pathToUtf8(process.output));
-            if (!std::filesystem::remove(process.output, error) || error)
-                throw std::runtime_error("Could not delete old output file: " + pathToUtf8(process.output) + ": " + error.message());
-            ++deleted;
-        }
-    }
-    return deleted;
-}
-
-static void prepareExactOutput(const std::filesystem::path& output)
-{
-    createDirectory(output.parent_path(), "output parent directory");
-
-    std::error_code error;
-    const auto status = std::filesystem::symlink_status(output, error);
-    if (error == std::errc::no_such_file_or_directory)
-        return;
-    if (error)
-        throw std::runtime_error("Could not inspect existing output file: " + error.message());
-    if (status.type() == std::filesystem::file_type::not_found)
-        return;
-    if (std::filesystem::is_symlink(status))
-        throw std::runtime_error("Refusing to use an output symbolic link: " + pathToUtf8(output));
-    if (!std::filesystem::is_regular_file(status))
-    {
-        throw std::runtime_error("Existing output path is not a regular file: " + pathToUtf8(output));
-    }
-
-    if (!std::filesystem::remove(output, error) || error)
-        throw std::runtime_error("Could not delete existing output file: " + pathToUtf8(output) + ": " +
-                                 error.message());
-}
-
 static std::filesystem::path runLogPath(const std::filesystem::path& logDirectory, const size_t fileIndex,
                                         const size_t groupIndex, const size_t runNumber)
 {
@@ -94,11 +33,10 @@ static std::filesystem::path runLogPath(const std::filesystem::path& logDirector
                            "-run-" + std::to_string(runNumber) + ".log");
 }
 
-static RunResult failedRun(const std::filesystem::path& output, const std::filesystem::path& logFile,
-                           const size_t runNumber, const size_t executionOrder, const std::string& error)
+static RunResult failedRun(const std::filesystem::path& logFile, const size_t runNumber,
+                           const size_t executionOrder, const std::string& error)
 {
     RunResult result;
-    result.outputFile = output;
     result.logFile = logFile;
     result.runNumber = runNumber;
     result.executionOrder = executionOrder;
@@ -209,21 +147,7 @@ int runBenchmark(const Config& config, const InputPlan& plan, const std::filesys
     for (const auto& input : plan.files)
         results.files.emplace_back(FileResult{.input = input});
 
-    createOutputDirectories(config, logDirectory);
-    writeMarkdownReport(config, results, reportPath, options);
-
-    try
-    {
-        results.startupDeletedFileCount = clearStartupOutputs(config, reportPath);
-    }
-    catch (const std::exception& error)
-    {
-        results.fatalError = error.what();
-        writeMarkdownReport(config, results, reportPath, options);
-        std::cerr << "Fatal cleanup error: " << error.what() << '\n';
-        return 1;
-    }
-
+    createDirectory(logDirectory, "process log directory");
     writeMarkdownReport(config, results, reportPath, options);
 
     const auto totalRuns = plan.files.size() * GroupCount * config.runsPerFile;
@@ -239,23 +163,21 @@ int runBenchmark(const Config& config, const InputPlan& plan, const std::filesys
             for (size_t runIndex = 0; runIndex < config.runsPerFile; ++runIndex)
             {
                 const auto runNumber = runIndex + 1;
-                const auto output = file.input.outputs[groupIndex];
                 const auto logFile = runLogPath(logDirectory, fileIndex, groupIndex, runNumber);
                 ++executionOrder;
 
                 RunResult run;
                 try
                 {
-                    prepareExactOutput(output);
                     const auto& group = config.groups[groupIndex];
                     const auto& process = group.processes[fileIndex];
                     const auto& executable = config.engines.at(process.engineName);
-                    run = runConverter(executable, file.input.source, output, process.expandedArguments,
-                                       logFile, runNumber, executionOrder, options);
+                    run = runConverter(executable, process.expandedArguments, logFile, runNumber,
+                                       executionOrder, options);
                 }
                 catch (const std::exception& error)
                 {
-                    run = failedRun(output, logFile, runNumber, executionOrder, error.what());
+                    run = failedRun(logFile, runNumber, executionOrder, error.what());
                 }
 
                 file.groupRuns[groupIndex].emplace_back(std::move(run));

@@ -273,7 +273,7 @@ std::string formatMiB(const uint64_t bytes)
     constexpr double bytesPerMiB = 1024.0 * 1024.0;
     constexpr double bytesPerGiB = bytesPerMiB * 1024.0;
     std::ostringstream stream;
-    stream << std::fixed << std::setprecision(1);
+    stream << std::fixed << std::setprecision(0);
     if (static_cast<double>(bytes) >= bytesPerGiB)
         stream << static_cast<double>(bytes) / bytesPerGiB << " GiB";
     else
@@ -287,7 +287,7 @@ std::string formatBytes(const uint64_t bytes)
     constexpr double bytesPerMiB = 1024.0 * 1024.0;
     constexpr double bytesPerGiB = bytesPerMiB * 1024.0;
     std::ostringstream stream;
-    stream << std::fixed << std::setprecision(2);
+    stream << std::fixed << std::setprecision(1);
 
     if (static_cast<double>(bytes) >= bytesPerGiB)
         stream << static_cast<double>(bytes) / bytesPerGiB << " GiB";

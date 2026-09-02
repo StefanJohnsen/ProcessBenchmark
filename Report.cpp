@@ -31,7 +31,6 @@ struct Representative final
     ResultState state = ResultState::Pending;
     double elapsedMilliseconds = 0.0;
     uint64_t peakWorkingSetBytes = 0;
-    uint64_t outputBytes = 0;
 };
 
 struct Aggregate final
@@ -80,8 +79,6 @@ static std::string reportSafeText(const Config& config, std::string value)
     hidePath(config.configPath);
     for (const auto& file : config.files) hidePath(file);
     for (const auto& [name, engine] : config.engines) { static_cast<void>(name); hidePath(engine); }
-    for (const auto& group : config.groups)
-        for (const auto& process : group.processes) hidePath(process.output);
     return markdownText(std::move(value));
 }
 
@@ -179,7 +176,7 @@ static void writeHardware(std::ostringstream& report)
     SYSTEM_INFO system{};
     GetNativeSystemInfo(&system);
 
-    report << "## Test System\n\n| Component | Value |\n|---|---|\n";
+    report << "<br>\n\n## Benchmark Hardware\n\n| Component | Value |\n|---|---|\n";
     report << "| CPU | " << markdownText(cpuName) << " |\n";
     report << "| CPU vendor | " << markdownText(vendor) << " |\n";
     report << "| Physical cores | " << physicalCoreCount() << " |\n";
@@ -211,22 +208,18 @@ static Representative representative(const std::vector<RunResult>& runs, const s
 
     std::vector<double> elapsed;
     std::vector<uint64_t> workingSet;
-    std::vector<uint64_t> outputSizes;
     elapsed.reserve(runs.size());
     workingSet.reserve(runs.size());
-    outputSizes.reserve(runs.size());
 
     for (const auto& run : runs)
     {
         elapsed.emplace_back(run.elapsedMilliseconds);
         workingSet.emplace_back(run.peakWorkingSetBytes);
-        outputSizes.emplace_back(run.outputBytes);
     }
 
     result.state = ResultState::Valid;
     result.elapsedMilliseconds = median(std::move(elapsed));
     result.peakWorkingSetBytes = median(std::move(workingSet));
-    result.outputBytes = median(std::move(outputSizes));
     return result;
 }
 
@@ -284,6 +277,43 @@ static std::string lowerComparison(const std::array<std::string, GroupCount>& gr
     return markdownText(groupNames[winner]) + ": " + formatPercent(percentage) + " less " + metricDescription;
 }
 
+static std::string fasterComparison(const std::array<std::string, GroupCount>& groupNames,
+                                    const std::array<double, GroupCount>& values)
+{
+    if (values[0] == values[1])
+        return "Tie";
+
+    const size_t winner = values[0] < values[1] ? 0 : 1;
+    const size_t loser = 1 - winner;
+    if (values[winner] <= 0.0)
+        return "N/A";
+
+    std::ostringstream speedup;
+    speedup << std::fixed << std::setprecision(2) << values[loser] / values[winner];
+    return markdownText(groupNames[winner]) + ": " + speedup.str() + "x faster";
+}
+
+static std::string lessComparison(const std::array<std::string, GroupCount>& groupNames,
+                                  const std::array<uint64_t, GroupCount>& values)
+{
+    if (values[0] == values[1])
+        return "Tie";
+
+    const size_t winner = values[0] < values[1] ? 0 : 1;
+    const size_t loser = 1 - winner;
+    if (values[loser] == 0)
+        return "N/A";
+
+    const auto percentage = static_cast<double>(values[loser] - values[winner]) /
+                            static_cast<double>(values[loser]) * 100.0;
+    return markdownText(groupNames[winner]) + ": " + formatPercent(percentage) + " less";
+}
+
+static std::string bestValue(const std::string& value)
+{
+    return "**" + value + "**";
+}
+
 static Aggregate aggregate(const Config& config, const std::vector<const FileResult*>& files)
 {
     Aggregate result;
@@ -314,7 +344,7 @@ static Aggregate aggregate(const Config& config, const std::vector<const FileRes
 }
 
 static void writeAggregate(std::ostringstream& report, const Config& config, const Aggregate& value,
-                           const BenchmarkOptions& options)
+                           const BenchmarkOptions& options, const bool includeBest)
 {
     const std::array<std::string, GroupCount> names = {config.groups[0].name, config.groups[1].name};
 
@@ -326,30 +356,73 @@ static void writeAggregate(std::ostringstream& report, const Config& config, con
     }
     report << "\n\n";
 
-    report << "| Metric | " << markdownText(names[0]) << " | " << markdownText(names[1]) << " | Comparison |\n";
-    report << "|---|---:|---:|---|\n";
+    report << "| Metric | " << markdownText(names[0]) << " | " << markdownText(names[1]) << " | Comparison |";
+    if (includeBest)
+        report << " Best |";
+    report << "\n|---|---:|---:|---|";
+    if (includeBest)
+        report << ":---:|";
+    report << '\n';
 
     if (value.comparableFiles == 0)
     {
         if (options.measureTime)
-            report << "| Run time | N/A | N/A | No comparable files |\n";
+            report << "| Run time | N/A | N/A | No comparable files |" << (includeBest ? " N/A |" : "") << '\n';
         if (options.measureMemory)
-            report << "| Peak RAM | N/A | N/A | No comparable files |\n";
+            report << "| RAM | N/A | N/A | No comparable files |" << (includeBest ? " N/A |" : "") << '\n';
         report << '\n';
         return;
     }
 
     if (options.measureTime)
     {
-        report << "| Total run time | " << formatDuration(value.elapsedMilliseconds[0]) << " | "
-               << formatDuration(value.elapsedMilliseconds[1]) << " | "
-               << lowerComparison(names, value.elapsedMilliseconds, "run time", true) << " |\n";
+        report << "| Total time | ";
+        for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
+        {
+            const auto formatted = formatDuration(value.elapsedMilliseconds[groupIndex]);
+            report << (includeBest &&
+                               value.elapsedMilliseconds[groupIndex] <= value.elapsedMilliseconds[1 - groupIndex]
+                           ? bestValue(formatted)
+                           : formatted)
+                   << " | ";
+        }
+        report << lowerComparison(names, value.elapsedMilliseconds, "run time", true) << " |";
+        if (includeBest)
+        {
+            report << ' ';
+            if (value.elapsedMilliseconds[0] == value.elapsedMilliseconds[1])
+                report << "Tie";
+            else
+                report << bestValue(
+                    markdownText(names[value.elapsedMilliseconds[0] < value.elapsedMilliseconds[1] ? 0 : 1]));
+            report << " |";
+        }
+        report << '\n';
     }
     if (options.measureMemory)
     {
-        report << "| Highest median peak RAM | " << formatMiB(value.peakWorkingSetBytes[0]) << " | "
-               << formatMiB(value.peakWorkingSetBytes[1]) << " | "
-               << lowerComparison(names, value.peakWorkingSetBytes, "peak RAM") << " |\n";
+        report << "| Highest median RAM | ";
+        for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
+        {
+            const auto formatted = formatMiB(value.peakWorkingSetBytes[groupIndex]);
+            report << (includeBest &&
+                               value.peakWorkingSetBytes[groupIndex] <= value.peakWorkingSetBytes[1 - groupIndex]
+                           ? bestValue(formatted)
+                           : formatted)
+                   << " | ";
+        }
+        report << lowerComparison(names, value.peakWorkingSetBytes, "RAM") << " |";
+        if (includeBest)
+        {
+            report << ' ';
+            if (value.peakWorkingSetBytes[0] == value.peakWorkingSetBytes[1])
+                report << "Tie";
+            else
+                report << bestValue(
+                    markdownText(names[value.peakWorkingSetBytes[0] < value.peakWorkingSetBytes[1] ? 0 : 1]));
+            report << " |";
+        }
+        report << '\n';
     }
     report << '\n';
 }
@@ -361,29 +434,24 @@ static void writeOverallPunchline(std::ostringstream& report, const Config& conf
         return;
 
     const std::array<std::string, GroupCount> names = {config.groups[0].name, config.groups[1].name};
-
     if (options.measureTime && value.elapsedMilliseconds[0] > 0.0 && value.elapsedMilliseconds[1] > 0.0)
     {
         if (value.elapsedMilliseconds[0] == value.elapsedMilliseconds[1])
-        {
-            report << "<p><strong>SPEED: TIE</strong></p>\n\n";
-        }
+            report << "### **SPEED: TIE**\n\n";
         else
         {
             const size_t winner = value.elapsedMilliseconds[0] < value.elapsedMilliseconds[1] ? 0 : 1;
             const size_t loser = 1 - winner;
-            report << "<p><strong>" << upperAscii(markdownText(names[winner])) << " IS "
+            report << "### **" << upperAscii(markdownText(names[winner])) << " IS "
                    << formatRatio(value.elapsedMilliseconds[loser] / value.elapsedMilliseconds[winner])
-                   << " FASTER</strong></p>\n\n";
+                   << " FASTER**\n\n";
         }
     }
 
     if (options.measureMemory && value.peakWorkingSetBytes[0] > 0 && value.peakWorkingSetBytes[1] > 0)
     {
         if (value.peakWorkingSetBytes[0] == value.peakWorkingSetBytes[1])
-        {
-            report << "<p><strong>PEAK RAM: TIE</strong></p>\n\n";
-        }
+            report << "### **RAM: TIE**\n\n";
         else
         {
             const size_t winner = value.peakWorkingSetBytes[0] < value.peakWorkingSetBytes[1] ? 0 : 1;
@@ -391,8 +459,8 @@ static void writeOverallPunchline(std::ostringstream& report, const Config& conf
             const auto percentage =
                 static_cast<double>(value.peakWorkingSetBytes[loser] - value.peakWorkingSetBytes[winner]) /
                 static_cast<double>(value.peakWorkingSetBytes[loser]) * 100.0;
-            report << "<p><strong>" << upperAscii(markdownText(names[winner])) << " USES " << formatPercent(percentage)
-                   << " LESS PEAK RAM</strong></p>\n\n";
+            report << "### **" << upperAscii(markdownText(names[winner])) << " USES " << formatPercent(percentage)
+                   << " LESS RAM**\n\n";
         }
     }
 }
@@ -400,7 +468,9 @@ static void writeOverallPunchline(std::ostringstream& report, const Config& conf
 static std::string comparisonBar(const double value, const double maximum)
 {
     constexpr size_t width = 24;
-    if (maximum <= 0.0 || value <= 0.0) return "N/A";
+    if (maximum <= 0.0 || value <= 0.0)
+        return "N/A";
+
     const auto filled = std::max<size_t>(1, static_cast<size_t>(std::llround(value / maximum * width)));
     std::string result;
     for (size_t index = 0; index < width; ++index)
@@ -410,7 +480,9 @@ static std::string comparisonBar(const double value, const double maximum)
 
 static std::string comparisonFactor(const double best, const double worst)
 {
-    if (best <= 0.0 || worst <= 0.0) return "N/A";
+    if (best <= 0.0 || worst <= 0.0)
+        return "N/A";
+
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(2) << worst / best << 'x';
     return stream.str();
@@ -419,8 +491,10 @@ static std::string comparisonFactor(const double best, const double worst)
 static void writeVisualComparison(std::ostringstream& report, const Config& config, const Aggregate& value,
                                   const BenchmarkOptions& options)
 {
-    if (value.comparableFiles == 0) return;
-    report << "<br>\n\n## Visual Comparison\n\nLower is better. Bars are normalized independently for each metric.\n\n";
+    if (value.comparableFiles == 0)
+        return;
+
+    report << "Lower is better. Bars are normalized independently for each metric.\n\n";
     report << "| Metric | Group | Usage | Value | Comp. | BEST |\n|---|---|---|---:|---:|:---:|\n";
     if (options.measureTime)
     {
@@ -429,25 +503,31 @@ static void writeVisualComparison(std::ostringstream& report, const Config& conf
         const auto tie = value.elapsedMilliseconds[0] == value.elapsedMilliseconds[1];
         const auto factor = comparisonFactor(value.elapsedMilliseconds[winner], maximum);
         for (size_t index = 0; index < GroupCount; ++index)
-            report << "| Total run time | " << markdownText(config.groups[index].name) << " | "
+        {
+            report << "| Total time | " << markdownText(config.groups[index].name) << " | "
                    << comparisonBar(value.elapsedMilliseconds[index], maximum) << " | "
                    << formatDuration(value.elapsedMilliseconds[index]) << " | "
                    << (tie ? "1.00x" : (index == winner ? factor : "-")) << " | "
-                   << (tie || index == winner ? "**x**" : "") << " |\n";
+                   << (tie || index == winner ? "&#128994;" : "") << " |\n";
+        }
     }
     if (options.measureMemory)
     {
         const auto maximum = static_cast<double>(std::max(value.peakWorkingSetBytes[0], value.peakWorkingSetBytes[1]));
         const auto winner = value.peakWorkingSetBytes[0] < value.peakWorkingSetBytes[1] ? 0U : 1U;
         const auto tie = value.peakWorkingSetBytes[0] == value.peakWorkingSetBytes[1];
-        const auto improvement = tie || maximum <= 0.0 ? 0.0 :
-            (maximum - static_cast<double>(value.peakWorkingSetBytes[winner])) / maximum * 100.0;
+        const auto improvement = tie || maximum <= 0.0
+                                     ? 0.0
+                                     : (maximum - static_cast<double>(value.peakWorkingSetBytes[winner])) / maximum *
+                                           100.0;
         for (size_t index = 0; index < GroupCount; ++index)
-            report << "| Highest median peak RAM | " << markdownText(config.groups[index].name) << " | "
+        {
+            report << "| Highest median RAM | " << markdownText(config.groups[index].name) << " | "
                    << comparisonBar(static_cast<double>(value.peakWorkingSetBytes[index]), maximum) << " | "
                    << formatMiB(value.peakWorkingSetBytes[index]) << " | "
                    << (tie ? "0.0%" : (index == winner ? formatPercent(improvement) + " less" : "-")) << " | "
-                   << (tie || index == winner ? "**x**" : "") << " |\n";
+                   << (tie || index == winner ? "&#128994;" : "") << " |\n";
+        }
     }
     report << '\n';
 }
@@ -456,23 +536,31 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
                               const BenchmarkOptions& options)
 {
     report << "# " << markdownText(config.title) << "\n\n";
+    if (results.completed)
+    {
+        std::vector<const FileResult*> files;
+        files.reserve(results.files.size());
+        for (const auto& file : results.files)
+            files.emplace_back(&file);
+        writeOverallPunchline(report, config, aggregate(config, files), options);
+    }
     writeHardware(report);
     const auto totalPlannedRuns = config.files.size() * config.groups.size() * config.runsPerFile;
     report << "## Benchmark Overview\n\n";
-    report << "This benchmark compares **" << config.groups.size() << " converter groups** across **"
+    report << "This benchmark compares **" << config.groups.size() << " process groups** across **"
            << config.files.size() << " input files**. Each configured process is run **" << config.runsPerFile << ' '
-           << (config.runsPerFile == 1 ? "time" : "times") << "** for each converter group, for a total of **"
+           << (config.runsPerFile == 1 ? "time" : "times") << "** for each process group, for a total of **"
            << totalPlannedRuns << " planned process runs**. Processes execute sequentially, one at a time, so they "
-              "do not compete with another converter process for CPU or memory during measurement.\n\n";
+              "do not compete with another benchmarked process for CPU or memory during measurement.\n\n";
     if (!results.completed)
         report << "> **In progress - results are incomplete.**\n\n";
 
-    report << "## Engines\n\n| Name | Executable |\n|---|---|\n";
+    report << "## Process Engines\n\n| Name | Executable |\n|---|---|\n";
     for (const auto& [name, executable] : config.engines)
         report << "| " << markdownText(name) << " | " << markdownCode(pathToUtf8(executable.filename())) << " |\n";
     report << '\n';
 
-    report << "## Files\n\n| Index | File | Input size |\n|---:|---|---:|\n";
+    report << "## Test Files\n\n| Index | File | Size |\n|---:|---|---:|\n";
     for (size_t index = 0; index < config.files.size(); ++index)
     {
         std::error_code error;
@@ -488,7 +576,8 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
         report << "| Index | Engine | Command Arguments |\n|---:|---|---|\n";
         for (size_t index = 0; index < group.processes.size(); ++index)
             report << "| " << index << " | " << markdownText(group.processes[index].engineName) << " | "
-                   << markdownCode(reportArguments(group.processes[index].expandedArguments)) << " |\n";
+                   << markdownCode(reportSafeText(config, reportArguments(group.processes[index].expandedArguments)))
+                   << " |\n";
         report << '\n';
     }
 
@@ -507,21 +596,22 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
     if (options.measureTime)
     {
         report << "<br>\n\n### Run Time Measurement\n\n";
-        report << "Run time uses a monotonic clock from immediately before the suspended converter process is "
-                  "resumed until the main process terminates. Executable initialization and output writing are "
+        report << "Run time uses a monotonic clock from immediately before the suspended process is "
+                  "resumed until the main process terminates. Executable initialization and all work performed by "
+                  "the process are "
                   "included; benchmark preflight and cleanup are excluded.\n\n";
     }
 
     if (options.measureMemory)
     {
         report << "<br>\n\n### Memory Measurement\n\n";
-        report << "Peak RAM is read with Microsoft's "
+        report << "RAM columns in result tables show the highest resident physical memory usage. It is read with Microsoft's "
                   "[GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/"
-                  "nf-psapi-getprocessmemoryinfo) from the direct converter process. `PeakWorkingSetSize` is "
+                  "nf-psapi-getprocessmemoryinfo) from the direct process. `PeakWorkingSetSize` is "
                   "maintained by Windows as the highest amount of resident physical memory during the run. "
                   "The process is polled every "
                << ProcessPollIntervalMilliseconds
-               << " ms, but the reported peak counter is maintained by Windows. Threads are included. Child "
+               << " ms, but the reported counter is maintained by Windows. Threads are included. Child "
                   "process memory and GPU/VRAM are not included. Values use MiB, where 1 MiB is 1,048,576 bytes. "
                   "See Microsoft's "
                   "[PROCESS_MEMORY_COUNTERS_EX documentation](https://learn.microsoft.com/en-us/windows/win32/api/"
@@ -535,30 +625,29 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
     const std::array<std::string, GroupCount> names = {config.groups[0].name, config.groups[1].name};
     report << "<br>\n\n## File type " << markdownCode(extension) << "\n\n";
     report << "<br>\n\n### Per-file results\n\n";
-    report << "| File | Extension | Input size | ";
+    report << "| File name | Ext | ";
     if (options.measureTime)
     {
-        report << markdownText(names[0]) << " run time | " << markdownText(names[1])
-               << " run time | Run time comparison | ";
+        report << markdownText(names[0]) << " time | " << markdownText(names[1])
+               << " time | Time comp. | ";
     }
     if (options.measureMemory)
     {
-        report << markdownText(names[0]) << " peak RAM | " << markdownText(names[1])
-               << " peak RAM | Memory comparison | ";
+        report << markdownText(names[0]) << " RAM | " << markdownText(names[1])
+               << " RAM | RAM comp. | ";
     }
-    report << "Status |\n|---|---|---:|";
+    report << "Status |\n|---|:---:|";
     if (options.measureTime)
-        report << "---:|---:|---|";
+        report << ":---:|:---:|---|";
     if (options.measureMemory)
         report << "---:|---:|---|";
-    report << "---|\n";
+    report << ":---:|\n";
 
     for (const auto* file : files)
     {
         const auto values = representatives(config, *file);
-        report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->input.relativeSource))) << " | "
-               << markdownCode(extensionWithoutDot(file->input.extension)) << " | "
-               << formatBytes(file->input.sourceBytes) << " | ";
+        report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->input.relativeSource.filename())))
+               << " | " << markdownCode(extensionWithoutDot(file->input.extension)) << " | ";
         if (!comparable(values))
         {
             if (options.measureTime)
@@ -593,53 +682,105 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
         const std::array<uint64_t, GroupCount> memory = {values[0].peakWorkingSetBytes, values[1].peakWorkingSetBytes};
         if (options.measureTime)
         {
-            report << formatDuration(runTimes[0]) << " | " << formatDuration(runTimes[1]) << " | "
-                   << lowerComparison(names, runTimes, "run time", true) << " | ";
+            for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
+            {
+                const auto formatted = formatDuration(runTimes[groupIndex]);
+                report << (runTimes[groupIndex] < runTimes[1 - groupIndex] ? bestValue(formatted) : formatted) << " | ";
+            }
+            report << fasterComparison(names, runTimes) << " | ";
         }
         if (options.measureMemory)
         {
-            report << formatMiB(memory[0]) << " | " << formatMiB(memory[1]) << " | "
-                   << lowerComparison(names, memory, "peak RAM") << " | ";
+            for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
+            {
+                const auto formatted = formatMiB(memory[groupIndex]);
+                report << (memory[groupIndex] < memory[1 - groupIndex] ? bestValue(formatted) : formatted) << " | ";
+            }
+            report << lessComparison(names, memory) << " | ";
         }
-        report << "Comparable |\n";
+        report << "OK |\n";
     }
     report << '\n';
 
     report << "<br>\n\n### Individual runs\n\n";
-    report << "| File | Extension | Input size | Group | Run | Order | ";
+    report << "| File name | Ext | Group | Run | ";
     if (options.measureTime)
-        report << "Run time | ";
+        report << "Time | ";
     if (options.measureMemory)
-        report << "Peak RAM | ";
-    report << "Output | Exit | Status |\n|---|---|---:|---|---:|---:|";
+        report << "RAM | ";
+    report << "Exit | Status | Best |\n|---|:---:|:---:|:---:|";
     if (options.measureTime)
-        report << "---:|";
+        report << ":---:|";
     if (options.measureMemory)
         report << "---:|";
-    report << "---:|---:|---|\n";
+    report << ":---:|:---:|:---:|\n";
+
+    const RunResult* fastestRun = nullptr;
+    const RunResult* lowestMemoryRun = nullptr;
+    for (const auto* file : files)
+    {
+        for (const auto& groupRuns : file->groupRuns)
+        {
+            for (const auto& run : groupRuns)
+            {
+                if (!run.success)
+                    continue;
+                if (options.measureTime &&
+                    (fastestRun == nullptr || run.elapsedMilliseconds < fastestRun->elapsedMilliseconds))
+                {
+                    fastestRun = &run;
+                }
+                if (options.measureMemory &&
+                    (lowestMemoryRun == nullptr || run.peakWorkingSetBytes < lowestMemoryRun->peakWorkingSetBytes))
+                {
+                    lowestMemoryRun = &run;
+                }
+            }
+        }
+    }
+    const auto fastestDisplayed = fastestRun == nullptr ? std::string{} : formatDuration(fastestRun->elapsedMilliseconds);
+    const auto lowestMemoryDisplayed =
+        lowestMemoryRun == nullptr ? std::string{} : formatMiB(lowestMemoryRun->peakWorkingSetBytes);
+
     for (const auto* file : files)
     {
         for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
         {
             for (const auto& run : file->groupRuns[groupIndex])
             {
-                report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->input.relativeSource))) << " | "
-                       << markdownCode(extensionWithoutDot(file->input.extension)) << " | "
-                       << formatBytes(file->input.sourceBytes) << " | " << markdownText(names[groupIndex]) << " | "
-                       << run.runNumber << " | " << run.executionOrder << " | ";
+                const auto displayedTime = formatDuration(run.elapsedMilliseconds);
+                const auto displayedMemory = formatMiB(run.peakWorkingSetBytes);
+                const bool hasBestTime = run.success && options.measureTime && displayedTime == fastestDisplayed;
+                const bool hasBestMemory =
+                    run.success && options.measureMemory && displayedMemory == lowestMemoryDisplayed;
+                const bool isBestRow = hasBestTime || hasBestMemory;
+                const auto fileName =
+                    markdownCode(pathToUtf8(pathWithoutExtension(file->input.relativeSource.filename())));
+                const auto extensionText = markdownCode(extensionWithoutDot(file->input.extension));
+                const auto groupName = markdownText(names[groupIndex]);
+                const auto runNumber = std::to_string(run.runNumber);
+
+                report << "| " << (isBestRow ? bestValue(fileName) : fileName) << " | "
+                       << (isBestRow ? bestValue(extensionText) : extensionText) << " | "
+                       << (isBestRow ? bestValue(groupName) : groupName) << " | "
+                       << (isBestRow ? bestValue(runNumber) : runNumber) << " | ";
                 if (options.measureTime)
-                    report << formatDuration(run.elapsedMilliseconds) << " | ";
+                {
+                    report << (hasBestTime ? bestValue(displayedTime) : displayedTime) << " | ";
+                }
                 if (options.measureMemory)
-                    report << formatMiB(run.peakWorkingSetBytes) << " | ";
-                report << formatBytes(run.outputBytes) << " | " << exitCodeText(run) << " | "
-                       << (run.success ? "OK" : "Failed") << " |\n";
+                {
+                    report << (hasBestMemory ? bestValue(displayedMemory) : displayedMemory) << " | ";
+                }
+                report << exitCodeText(run) << " | " << (run.success ? "OK" : "Failed") << " | "
+                       << (isBestRow ? "&#128994;" : "") << " |\n";
             }
         }
     }
     report << '\n';
 
     report << "<br>\n\n### File type summary\n\n";
-    writeAggregate(report, config, aggregate(config, files), options);
+    writeAggregate(report, config, aggregate(config, files), options, false);
 }
 
 static void writeFailures(std::ostringstream& report, const Config& config, const BenchmarkResults& results)
@@ -695,7 +836,7 @@ static void writeConfigurationUsed(std::ostringstream& report, const Config& con
 
     std::string fence = "```";
     while (text.find(fence) != std::string::npos) fence.push_back('`');
-    report << "<br>\n\n# Configuration Used\n\n" << fence << "text\n" << text;
+    report << "<br>\n<br>\n\n# Configuration Used\n\n" << fence << "text\n" << text;
     if (text.empty() || text.back() != '\n') report << '\n';
     report << fence << '\n';
 }
@@ -743,11 +884,16 @@ void writeMarkdownReport(const Config& config, const BenchmarkResults& results, 
     for (const auto& [extension, files] : byExtension)
         writeFileType(report, config, extension, files, options);
 
-    report << "<br>\n\n# Overall Performance\n\n";
+    report << "<br>\n<br>\n\n# Overall Performance\n\n";
     const auto overall = aggregate(config, allFiles);
-    writeAggregate(report, config, overall, options);
-    writeOverallPunchline(report, config, overall, options);
+    report << "Comparable files: **" << overall.comparableFiles << '/' << overall.totalFiles << "**\n\n";
+    if (overall.invalidFiles[0] != 0 || overall.invalidFiles[1] != 0)
+    {
+        report << "Invalid files: " << markdownText(config.groups[0].name) << " **" << overall.invalidFiles[0]
+               << "**, " << markdownText(config.groups[1].name) << " **" << overall.invalidFiles[1] << "**\n\n";
+    }
     writeVisualComparison(report, config, overall, options);
+    writeOverallPunchline(report, config, overall, options);
     writeFailures(report, config, results);
     writeConfigurationUsed(report, config);
     writeAtomic(reportPath, report.str());

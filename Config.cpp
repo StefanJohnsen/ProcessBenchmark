@@ -1,8 +1,5 @@
 #include "Config.h"
 
-#include <Windows.h>
-#include <shellapi.h>
-
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -23,12 +20,17 @@ static std::string trim(std::string value)
     return value.substr(first, value.find_last_not_of(" \t\r\n") - first + 1);
 }
 
-static std::vector<std::string> columns(const std::string& line)
+static std::vector<std::string> columns(const std::string& line, const size_t maximumColumns = 0)
 {
     std::vector<std::string> result;
     size_t start = 0;
     while (true)
     {
+        if (maximumColumns != 0 && result.size() + 1 == maximumColumns)
+        {
+            result.emplace_back(trim(line.substr(start)));
+            return result;
+        }
         const auto separator = line.find('|', start);
         result.emplace_back(trim(line.substr(start, separator == std::string::npos ? separator : separator - start)));
         if (separator == std::string::npos) return result;
@@ -74,22 +76,6 @@ static std::string replaceAll(std::string value, const std::string& token, const
     return value;
 }
 
-static std::vector<std::filesystem::path> absoluteFileArguments(const std::string& arguments)
-{
-    const auto wide = pathFromUtf8(arguments).wstring();
-    int count = 0;
-    auto* values = CommandLineToArgvW(wide.c_str(), &count);
-    if (values == nullptr)
-        throw std::runtime_error("Could not parse Command Arguments: " + windowsErrorMessage(GetLastError()));
-    std::vector<std::filesystem::path> result;
-    for (int index = 0; index < count; ++index)
-    {
-        std::filesystem::path value(values[index]);
-        if (value.is_absolute()) result.emplace_back(normalizeAbsolutePath(value));
-    }
-    LocalFree(values);
-    return result;
-}
 } // namespace
 
 std::string expandCommandArguments(const std::string& value, const std::filesystem::path& file)
@@ -99,6 +85,7 @@ std::string expandCommandArguments(const std::string& value, const std::filesyst
     auto result = replaceAll(value, "{file.dir}", directory);
     result = replaceAll(result, "{file.name}", pathToUtf8(file.stem()));
     result = replaceAll(result, "{file.ext}", pathToUtf8(file.extension()));
+    result = replaceAll(result, "{file}", pathToUtf8(file));
     if (result.find("{file.") != std::string::npos)
         throw std::runtime_error("Command Arguments contains an unknown file placeholder: " + value);
     return result;
@@ -153,7 +140,7 @@ Config loadConfig(const std::filesystem::path& configPath)
         if (section == Section::None || section == Section::Placeholders || text == "INSTRUCTIONS" || text[0] == '#' ||
             text.rfind("Placeholders ", 0) == 0 || text.rfind("Example file:", 0) == 0 || separatorLine(text)) continue;
 
-        const auto values = columns(text);
+        const auto values = columns(text, section == Section::Processes ? 3 : 0);
         if ((section == Section::Engines && values.size() >= 2 && values[0] == "Name") ||
             (section == Section::Files && values.size() >= 2 && values[0] == "Index") ||
             (section == Section::Processes && values.size() >= 3 && values[0] == "Index")) continue;
@@ -204,11 +191,6 @@ Config loadConfig(const std::filesystem::path& configPath)
             if (!config.engines.contains(process.engineName))
                 throw std::runtime_error("Group '" + group.name + "' references unknown engine '" + process.engineName + "'.");
             process.expandedArguments = expandCommandArguments(process.commandArguments, config.files[index]);
-            const auto paths = absoluteFileArguments(process.expandedArguments);
-            if (paths.size() < 2) throw std::runtime_error("Group '" + group.name + "', index " + std::to_string(index) + " must contain input and output file arguments.");
-            if (!samePath(paths[0], config.files[index])) throw std::runtime_error("Group '" + group.name + "', index " + std::to_string(index) + " must use the matching FILES entry as its first file argument.");
-            if (samePath(paths[0], paths[1])) throw std::runtime_error("Input and output file must be different.");
-            process.output = paths[1];
         }
     }
     return config;
@@ -226,8 +208,6 @@ InputPlan buildInputPlan(const Config& config)
         std::error_code error;
         file.sourceBytes = std::filesystem::file_size(file.source, error);
         if (error) throw std::runtime_error("Could not read input file size: " + pathToUtf8(file.source));
-        for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
-            file.outputs[groupIndex] = config.groups[groupIndex].processes[index].output;
         plan.files.emplace_back(std::move(file));
     }
     return plan;

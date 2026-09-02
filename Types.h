@@ -17,7 +17,6 @@ struct ProcessConfig final
     std::string engineName;
     std::string commandArguments;
     std::string expandedArguments;
-    std::filesystem::path output;
 };
 
 struct ConverterGroup final
@@ -48,7 +47,6 @@ struct InputFile final
     std::filesystem::path relativeSource;
     std::string extension;
     uint64_t sourceBytes = 0;
-    std::array<std::filesystem::path, GroupCount> outputs;
 };
 
 struct InputPlan final
@@ -61,11 +59,9 @@ struct RunResult final
 {
     size_t runNumber = 0;
     size_t executionOrder = 0;
-    std::filesystem::path outputFile;
     std::filesystem::path logFile;
     double elapsedMilliseconds = 0.0;
     uint64_t peakWorkingSetBytes = 0;
-    uint64_t outputBytes = 0;
     std::optional<uint32_t> exitCode;
     bool success = false;
     std::string error;
@@ -81,7 +77,6 @@ struct BenchmarkResults final
 {
     std::vector<FileResult> files;
     size_t unsupportedFileCount = 0;
-    size_t startupDeletedFileCount = 0;
     bool completed = false;
     std::string fatalError;
 };
