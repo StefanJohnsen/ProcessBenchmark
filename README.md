@@ -36,7 +36,7 @@ Open `ProcessBenchmark.sln` in Visual Studio 2022 and build the `Release | x64` 
 # Configuration
 
 Copy the ASCII [`config.example.txt`](config.example.txt) file, give the copy a descriptive name for your test, and
-adapt it to the processes you want to benchmark. For example, rename it to `testProcess.txt`. The configuration
+adapt it to the processes you want to benchmark. For example, rename it to `processTest.txt`. The configuration
 tells ProcessBenchmark what to run:
 
 1. Write the report title on the first line.
@@ -55,6 +55,10 @@ or rearranging its contents. Use double quotes when an individual argument conta
 
 The matching `FILES` entry is the file identity used for measurements and report comparisons. It does not impose a
 particular position or role on the process's command arguments.
+
+Paths under `ENGINES` and `FILES` may use `/`, `\` or doubled `\\` separators and may optionally be enclosed in
+single or double quotes. ProcessBenchmark normalizes these paths internally. Text under `Command Arguments` is never
+normalized because it belongs to the selected process.
 
 ProcessBenchmark does not identify, create, validate or delete output files. A process may have no output argument at
 all. If your process requires an output path not to exist, remove old output yourself before starting the benchmark.
@@ -119,14 +123,63 @@ order shown: Test 1 followed by Test 2 for each file.
 Give ProcessBenchmark the absolute path to your configuration file:
 
 ```bat
-ProcessBenchmark.exe "C:\Benchmark\testProcess.txt"
+ProcessBenchmark.exe "C:\Benchmark\processTest.txt"
 ```
 
 The report is written beside the configuration file with the same base name. In this example, the report is
-`C:\Benchmark\testProcess.md`.
+`C:\Benchmark\processTest.md`.
 
-Use `--time-only` or `--ram-only` to measure one metric, or run `ProcessBenchmark.exe -help` to see all available
-options.
+Use `--time-only` or `--ram-only` to measure one metric. A Markdown report is created by default; use `--noreport`
+when only the console result is needed. These options can be combined. Run `ProcessBenchmark.exe -help` to see all
+available options.
+
+```bat
+ProcessBenchmark.exe -help
+```
+
+```text
+ProcessBenchmark
+
+Usage:
+  ProcessBenchmark.exe [options] "C:\full\path\processTest.txt"
+
+Options:
+  -time-only    Measure and report run time only
+  -ram-only     Measure and report peak RAM only
+  -noreport     Do not create a Markdown report
+  -help         Show this help message
+  -version      Show version information
+
+Options also accept the double-dash form, for example --time-only.
+The text configuration path must be absolute.
+The Markdown report is written beside it with the .md extension.
+```
+
+For example:
+
+```bat
+ProcessBenchmark.exe "C:\full\path\processTest.txt"
+```
+
+After the individual runs, the console shows the overall comparison:
+
+```text
+Overall Performance
+
+Comparable files: 2/2
+
+Lower is better. Bars are normalized independently for each metric.
+
+Metric             | Group  | Usage                    |     Value |      Comp. | BEST
+-------------------+--------+--------------------------+-----------+------------+-----
+Total time         | Test 1 | ████████████████████████ | 00:00.757 |          - |
+Total time         | Test 2 | ██████████████████████░░ | 00:00.684 |      1.11x | 🟢
+Highest median RAM | Test 1 | ████████████████████████ |    66 MiB | 0.15% less | 🟢
+Highest median RAM | Test 2 | ████████████████████████ |    66 MiB |          - |
+
+TEST 2 IS 1.11x FASTER
+TEST 1 USES 0.15% LESS RAM
+```
 
 ## Report and measurements
 

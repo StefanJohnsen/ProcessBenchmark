@@ -11,7 +11,7 @@ namespace benchmark
 {
 namespace
 {
-enum class Section { None, Engines, Files, Processes, Placeholders };
+enum class Section { None, Engines, Files, Processes };
 
 static std::string trim(std::string value)
 {
@@ -53,7 +53,13 @@ static size_t parseIndex(const std::string& text, const std::string& context)
 
 static std::filesystem::path absolutePath(const std::string& text, const std::string& context)
 {
-    auto path = pathFromUtf8(text);
+    auto value = text;
+    if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                              (value.front() == '\'' && value.back() == '\'')))
+        value = value.substr(1, value.size() - 2);
+    std::replace(value.begin(), value.end(), '\\', '/');
+
+    auto path = pathFromUtf8(value);
     if (!path.is_absolute()) throw std::runtime_error(context + " must be an absolute path.");
     return normalizeAbsolutePath(path);
 }
@@ -136,8 +142,9 @@ Config loadConfig(const std::filesystem::path& configPath)
             section = Section::Processes;
             continue;
         }
-        if (text == "FILE PLACEHOLDERS") { section = Section::Placeholders; currentGroup = nullptr; continue; }
-        if (section == Section::None || section == Section::Placeholders || text == "INSTRUCTIONS" || text[0] == '#' ||
+        if (text.rfind("FILE PLACEHOLDERS", 0) == 0)
+            break;
+        if (section == Section::None || text == "INSTRUCTIONS" || text[0] == '#' ||
             text.rfind("Placeholders ", 0) == 0 || text.rfind("Example file:", 0) == 0 || separatorLine(text)) continue;
 
         const auto values = columns(text, section == Section::Processes ? 3 : 0);

@@ -13,33 +13,11 @@
 
 namespace
 {
-struct OutputPaths final
+static std::filesystem::path createReportPath(const std::filesystem::path& configPath)
 {
-    std::filesystem::path report;
-    std::filesystem::path logs;
-};
-
-static OutputPaths createOutputPaths(const std::filesystem::path& configPath)
-{
-    auto stem = configPath.stem().wstring();
-    if (stem.empty())
-        stem = L"benchmark";
-
     auto report = configPath;
     report.replace_extension(L".md");
-
-    const auto timestamp = benchmark::pathFromUtf8(benchmark::timestampForFileName()).wstring();
-    const auto logBase = stem + L"-" + timestamp + L"-logs";
-
-    for (size_t suffix = 0; suffix < 1000; ++suffix)
-    {
-        const auto unique = suffix == 0 ? logBase : logBase + L"-" + std::to_wstring(suffix + 1);
-        const auto logs = configPath.parent_path() / unique;
-        if (!std::filesystem::exists(logs))
-            return {report, logs};
-    }
-
-    throw std::runtime_error("Could not create a unique converter log directory name.");
+    return report;
 }
 } // namespace
 
@@ -65,26 +43,28 @@ int wmain(const int argc, wchar_t* argv[])
         const auto& options = arguments.benchmarkOptions;
         const auto config = benchmark::loadConfig(arguments.configPath);
         const auto plan = benchmark::buildInputPlan(config);
-        const auto outputPaths = createOutputPaths(config.configPath);
+        const auto reportPath = createReportPath(config.configPath);
 
         std::cout << "Configuration validated successfully.\n"
                   << "Supported input files: " << plan.files.size() << '\n'
                   << "Unsupported input files skipped: " << plan.unsupportedFileCount << '\n'
                   << "Runs per file and group: " << config.runsPerFile << '\n'
-                  << "Execution mode: sequential\n"
                   << "Measurements: "
                   << (options.measureTime && options.measureMemory
                           ? "run time and peak RAM"
                           : (options.measureTime ? "run time only" : "peak RAM only"))
-                  << '\n'
-                  << "Markdown report: " << benchmark::pathToUtf8(outputPaths.report) << "\n\n";
+                  << '\n';
+        if (options.createReport)
+            std::cout << "Markdown report: " << benchmark::pathToUtf8(reportPath) << '\n';
+        std::cout << '\n';
 
-        const auto exitCode = benchmark::runBenchmark(config, plan, outputPaths.report, outputPaths.logs, options);
+        const auto exitCode = benchmark::runBenchmark(config, plan, reportPath, options);
         if (exitCode == 0)
             std::cout << "\nBenchmark completed successfully.\n";
         else
             std::cout << "\nBenchmark completed with errors.\n";
-        std::cout << "Report: " << benchmark::pathToUtf8(outputPaths.report) << '\n';
+        if (options.createReport)
+            std::cout << "Report: " << benchmark::pathToUtf8(reportPath) << '\n';
         return exitCode;
     }
     catch (const std::exception& error)

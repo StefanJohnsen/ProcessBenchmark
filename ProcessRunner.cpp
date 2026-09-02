@@ -180,23 +180,21 @@ static std::wstring buildCommandLine(const std::filesystem::path& executable, co
 } // namespace
 
 RunResult runConverter(const std::filesystem::path& executable, const std::string& commandArguments,
-                       const std::filesystem::path& logFile, const size_t runNumber,
-                       const size_t executionOrder, const BenchmarkOptions& options)
+                       const size_t runNumber, const size_t executionOrder, const BenchmarkOptions& options)
 {
     RunResult result;
     result.runNumber = runNumber;
     result.executionOrder = executionOrder;
-    result.logFile = logFile;
 
     SECURITY_ATTRIBUTES security{};
     security.nLength = sizeof(security);
     security.bInheritHandle = TRUE;
 
-    UniqueHandle log(CreateFileW(logFile.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, &security,
-                                 CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-    if (!log.valid())
+    UniqueHandle nullOutput(CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &security,
+                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    if (!nullOutput.valid())
     {
-        result.error = "Could not create process log: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not open the null output device: " + windowsErrorMessage(GetLastError());
         return result;
     }
 
@@ -223,15 +221,15 @@ RunResult runConverter(const std::filesystem::path& executable, const std::strin
         return result;
     }
 
-    std::vector<HANDLE> inheritedHandles = {nullInput.get(), log.get()};
+    std::vector<HANDLE> inheritedHandles = {nullInput.get(), nullOutput.get()};
     ThreadAttributeList attributes(inheritedHandles);
 
     STARTUPINFOEXW startup{};
     startup.StartupInfo.cb = sizeof(startup);
     startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
     startup.StartupInfo.hStdInput = nullInput.get();
-    startup.StartupInfo.hStdOutput = log.get();
-    startup.StartupInfo.hStdError = log.get();
+    startup.StartupInfo.hStdOutput = nullOutput.get();
+    startup.StartupInfo.hStdError = nullOutput.get();
     startup.lpAttributeList = attributes.get();
 
     auto commandLine = buildCommandLine(executable, commandArguments);
@@ -251,7 +249,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::strin
 
     UniqueHandle process(processInformation.hProcess);
     UniqueHandle thread(processInformation.hThread);
-    log.reset();
+    nullOutput.reset();
     nullInput.reset();
 
     if (!AssignProcessToJobObject(job.get(), process.get()))

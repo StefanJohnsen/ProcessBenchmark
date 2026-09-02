@@ -9,6 +9,5 @@
 namespace benchmark
 {
 RunResult runConverter(const std::filesystem::path& executable, const std::string& commandArguments,
-                       const std::filesystem::path& logFile, size_t runNumber, size_t executionOrder,
-                       const BenchmarkOptions& options);
+                       size_t runNumber, size_t executionOrder, const BenchmarkOptions& options);
 }

@@ -39,6 +39,7 @@ struct BenchmarkOptions final
 {
     bool measureTime = true;
     bool measureMemory = true;
+    bool createReport = true;
 };
 
 struct InputFile final
@@ -59,7 +60,6 @@ struct RunResult final
 {
     size_t runNumber = 0;
     size_t executionOrder = 0;
-    std::filesystem::path logFile;
     double elapsedMilliseconds = 0.0;
     uint64_t peakWorkingSetBytes = 0;
     std::optional<uint32_t> exitCode;
