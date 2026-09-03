@@ -114,7 +114,7 @@ class ThreadAttributeList final
     LPPROC_THREAD_ATTRIBUTE_LIST list_ = nullptr;
 };
 
-static bool sampleMemory(const HANDLE process, RunResult& result)
+static bool samplePeakWorkingSet(const HANDLE process, RunResult& result)
 {
     PROCESS_MEMORY_COUNTERS_EX counters{};
     counters.cb = sizeof(counters);
@@ -179,8 +179,8 @@ static std::wstring buildCommandLine(const std::filesystem::path& executable, co
 }
 } // namespace
 
-RunResult runConverter(const std::filesystem::path& executable, const std::string& commandArguments,
-                       const size_t runNumber, const BenchmarkOptions& options)
+RunResult runProcess(const std::filesystem::path& executable, const std::string& commandArguments,
+                     const size_t runNumber, const BenchmarkOptions& options)
 {
     RunResult result;
     result.runNumber = runNumber;
@@ -273,14 +273,14 @@ RunResult runConverter(const std::filesystem::path& executable, const std::strin
 
     bool sampledMemory = false;
     if (options.measureMemory)
-        sampledMemory = sampleMemory(process.get(), result);
+        sampledMemory = samplePeakWorkingSet(process.get(), result);
     while (true)
     {
         const auto wait = WaitForSingleObject(process.get(), ProcessPollIntervalMilliseconds);
         if (wait == WAIT_TIMEOUT)
         {
             if (options.measureMemory)
-                sampledMemory = sampleMemory(process.get(), result) || sampledMemory;
+                sampledMemory = samplePeakWorkingSet(process.get(), result) || sampledMemory;
             continue;
         }
         if (wait == WAIT_OBJECT_0)
@@ -297,7 +297,7 @@ RunResult runConverter(const std::filesystem::path& executable, const std::strin
     if (options.measureTime)
         result.elapsedMilliseconds = std::chrono::duration<double, std::milli>(stopped - started).count();
     if (options.measureMemory)
-        sampledMemory = sampleMemory(process.get(), result) || sampledMemory;
+        sampledMemory = samplePeakWorkingSet(process.get(), result) || sampledMemory;
 
     DWORD exitCode = 0;
     if (GetExitCodeProcess(process.get(), &exitCode))

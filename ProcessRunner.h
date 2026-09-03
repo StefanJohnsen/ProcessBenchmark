@@ -8,6 +8,6 @@
 
 namespace benchmark
 {
-RunResult runConverter(const std::filesystem::path& executable, const std::string& commandArguments, size_t runNumber,
-                       const BenchmarkOptions& options);
+RunResult runProcess(const std::filesystem::path& executable, const std::string& commandArguments, size_t runNumber,
+                     const BenchmarkOptions& options);
 }

@@ -27,14 +27,14 @@ enum class ResultState
     Invalid
 };
 
-struct Representative final
+struct RunSummary final
 {
     ResultState state = ResultState::Pending;
     double elapsedMilliseconds = 0.0;
     uint64_t peakWorkingSetBytes = 0;
 };
 
-struct Aggregate final
+struct AggregateResult final
 {
     size_t totalFiles = 0;
     size_t comparableFiles = 0;
@@ -173,7 +173,7 @@ static size_t physicalCoreCount()
     return count;
 }
 
-static std::string reportArguments(const std::string& arguments)
+static std::string formatArgumentsForReport(const std::string& arguments)
 {
     const auto wide = pathFromUtf8(arguments).wstring();
     int count = 0;
@@ -234,9 +234,9 @@ static void writeHardware(std::ostringstream& report)
               "nf-sysinfoapi-globalmemorystatusex).\n\n";
 }
 
-static Representative representative(const std::vector<RunResult>& runs, const size_t expectedRuns)
+static RunSummary summarizeRuns(const std::vector<RunResult>& runs, const size_t expectedRuns)
 {
-    Representative result;
+    RunSummary result;
     if (runs.size() < expectedRuns)
         return result;
 
@@ -264,18 +264,17 @@ static Representative representative(const std::vector<RunResult>& runs, const s
     return result;
 }
 
-static std::array<Representative, GroupCount> representatives(const Config& config, const FileResult& file)
+static std::array<RunSummary, GroupCount> summarizeGroups(const Config& config, const FileResult& file)
 {
-    return {representative(file.groupRuns[0], config.runsPerFile),
-            representative(file.groupRuns[1], config.runsPerFile)};
+    return {summarizeRuns(file.groupRuns[0], config.runsPerFile), summarizeRuns(file.groupRuns[1], config.runsPerFile)};
 }
 
-static bool comparable(const std::array<Representative, GroupCount>& values)
+static bool comparable(const std::array<RunSummary, GroupCount>& values)
 {
     return values[0].state == ResultState::Valid && values[1].state == ResultState::Valid;
 }
 
-static std::string stateText(const std::array<Representative, GroupCount>& values)
+static std::string stateText(const std::array<RunSummary, GroupCount>& values)
 {
     if (comparable(values))
         return "Comparable";
@@ -355,14 +354,14 @@ static std::string bestValue(const std::string& value)
     return "**" + value + "**";
 }
 
-static Aggregate aggregate(const Config& config, const std::vector<const FileResult*>& files)
+static AggregateResult calculateAggregate(const Config& config, const std::vector<const FileResult*>& files)
 {
-    Aggregate result;
+    AggregateResult result;
     result.totalFiles = files.size();
 
     for (const auto* file : files)
     {
-        const auto values = representatives(config, *file);
+        const auto values = summarizeGroups(config, *file);
         for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
         {
             if (values[groupIndex].state == ResultState::Invalid)
@@ -384,7 +383,7 @@ static Aggregate aggregate(const Config& config, const std::vector<const FileRes
     return result;
 }
 
-static void writeAggregate(std::ostringstream& report, const Config& config, const Aggregate& value,
+static void writeAggregate(std::ostringstream& report, const Config& config, const AggregateResult& value,
                            const BenchmarkOptions& options, const bool includeBest)
 {
     const std::array<std::string, GroupCount> names = {config.groups[0].name, config.groups[1].name};
@@ -466,7 +465,7 @@ static void writeAggregate(std::ostringstream& report, const Config& config, con
     report << '\n';
 }
 
-static void writeOverallPunchline(std::ostringstream& report, const Config& config, const Aggregate& value,
+static void writeOverallPunchline(std::ostringstream& report, const Config& config, const AggregateResult& value,
                                   const BenchmarkOptions& options)
 {
     if (value.comparableFiles == 0)
@@ -527,8 +526,8 @@ static std::string comparisonFactor(const double best, const double worst)
     return stream.str();
 }
 
-static void writeVisualComparison(std::ostringstream& report, const Config& config, const Aggregate& value,
-                                  const BenchmarkOptions& options)
+static void writeOverallComparison(std::ostringstream& report, const Config& config, const AggregateResult& value,
+                                   const BenchmarkOptions& options)
 {
     if (value.comparableFiles == 0)
         return;
@@ -571,8 +570,8 @@ static void writeVisualComparison(std::ostringstream& report, const Config& conf
     report << '\n';
 }
 
-static void writeIntroduction(std::ostringstream& report, const Config& config, const BenchmarkResults& results,
-                              const BenchmarkOptions& options)
+static void writeReportOverview(std::ostringstream& report, const Config& config, const BenchmarkResults& results,
+                                const BenchmarkOptions& options)
 {
     report << "# " << markdownText(config.title) << "\n\n";
     report << "*Automatically generated by [ProcessBenchmark]"
@@ -584,7 +583,7 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
         files.reserve(results.files.size());
         for (const auto& file : results.files)
             files.emplace_back(&file);
-        writeOverallPunchline(report, config, aggregate(config, files), options);
+        writeOverallPunchline(report, config, calculateAggregate(config, files), options);
     }
     writeHardware(report);
     const auto totalPlannedRuns = config.files.size() * config.groups.size() * config.runsPerFile;
@@ -619,7 +618,8 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
         report << "| Index | Engine | Command Arguments |\n|---:|---|---|\n";
         for (size_t index = 0; index < group.processes.size(); ++index)
             report << "| " << index << " | " << markdownText(group.processes[index].engineName) << " | "
-                   << markdownCode(reportSafeText(config, reportArguments(group.processes[index].commandArguments)))
+                   << markdownCode(
+                          reportSafeText(config, formatArgumentsForReport(group.processes[index].commandArguments)))
                    << " |\n";
         report << '\n';
     }
@@ -663,8 +663,8 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
     }
 }
 
-static void writeFileType(std::ostringstream& report, const Config& config, const std::string& extension,
-                          const std::vector<const FileResult*>& files, const BenchmarkOptions& options)
+static void writeFileTypeResults(std::ostringstream& report, const Config& config, const std::string& extension,
+                                 const std::vector<const FileResult*>& files, const BenchmarkOptions& options)
 {
     const std::array<std::string, GroupCount> names = {config.groups[0].name, config.groups[1].name};
     report << "<br>\n\n## File type " << markdownCode(extension) << "\n\n";
@@ -687,9 +687,9 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
 
     for (const auto* file : files)
     {
-        const auto values = representatives(config, *file);
-        report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->input.source.filename()))) << " | "
-               << markdownCode(extensionWithoutDot(file->input.extension)) << " | ";
+        const auto values = summarizeGroups(config, *file);
+        report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->file.path.filename()))) << " | "
+               << markdownCode(extensionWithoutDot(file->file.extension)) << " | ";
         if (!comparable(values))
         {
             if (options.measureTime)
@@ -797,8 +797,8 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
                 const bool hasBestMemory =
                     run.success && options.measureMemory && displayedMemory == lowestMemoryDisplayed;
                 const bool isBestRow = hasBestTime || hasBestMemory;
-                const auto fileName = markdownCode(pathToUtf8(pathWithoutExtension(file->input.source.filename())));
-                const auto extensionText = markdownCode(extensionWithoutDot(file->input.extension));
+                const auto fileName = markdownCode(pathToUtf8(pathWithoutExtension(file->file.path.filename())));
+                const auto extensionText = markdownCode(extensionWithoutDot(file->file.extension));
                 const auto groupName = markdownText(names[groupIndex]);
                 const auto runNumber = std::to_string(run.runNumber);
 
@@ -822,7 +822,7 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
     report << '\n';
 
     report << "<br>\n\n### File type summary\n\n";
-    writeAggregate(report, config, aggregate(config, files), options, false);
+    writeAggregate(report, config, calculateAggregate(config, files), options, false);
 }
 
 static void writeFailures(std::ostringstream& report, const Config& config, const BenchmarkResults& results)
@@ -842,7 +842,7 @@ static void writeFailures(std::ostringstream& report, const Config& config, cons
                     wroteHeading = true;
                 }
 
-                report << "- " << markdownCode(pathToUtf8(file.input.source.filename())) << ", group **"
+                report << "- " << markdownCode(pathToUtf8(file.file.path.filename())) << ", group **"
                        << markdownText(config.groups[groupIndex].name) << "**, run " << run.runNumber << ": "
                        << reportSafeText(config, run.error.empty() ? "Unknown error." : run.error);
                 report << '\n';
@@ -914,29 +914,29 @@ void writeMarkdownReport(const Config& config, const BenchmarkResults& results, 
                          const BenchmarkOptions& options)
 {
     std::ostringstream report;
-    writeIntroduction(report, config, results, options);
+    writeReportOverview(report, config, results, options);
 
     std::map<std::string, std::vector<const FileResult*>> byExtension;
     std::vector<const FileResult*> allFiles;
     allFiles.reserve(results.files.size());
     for (const auto& file : results.files)
     {
-        byExtension[file.input.extension].emplace_back(&file);
+        byExtension[file.file.extension].emplace_back(&file);
         allFiles.emplace_back(&file);
     }
 
     for (const auto& [extension, files] : byExtension)
-        writeFileType(report, config, extension, files, options);
+        writeFileTypeResults(report, config, extension, files, options);
 
     report << "<br>\n<br>\n\n# Overall Performance\n\n";
-    const auto overall = aggregate(config, allFiles);
+    const auto overall = calculateAggregate(config, allFiles);
     report << "Comparable files: **" << overall.comparableFiles << '/' << overall.totalFiles << "**\n\n";
     if (overall.invalidFiles[0] != 0 || overall.invalidFiles[1] != 0)
     {
         report << "Invalid files: " << markdownText(config.groups[0].name) << " **" << overall.invalidFiles[0] << "**, "
                << markdownText(config.groups[1].name) << " **" << overall.invalidFiles[1] << "**\n\n";
     }
-    writeVisualComparison(report, config, overall, options);
+    writeOverallComparison(report, config, overall, options);
     writeOverallPunchline(report, config, overall, options);
     writeFailures(report, config, results);
     writeConfigurationUsed(report, config);
@@ -946,7 +946,7 @@ void writeMarkdownReport(const Config& config, const BenchmarkResults& results, 
 size_t comparablePairCount(const Config& config, const BenchmarkResults& results)
 {
     return static_cast<size_t>(std::count_if(results.files.begin(), results.files.end(), [&](const FileResult& file)
-                                             { return comparable(representatives(config, file)); }));
+                                             { return comparable(summarizeGroups(config, file)); }));
 }
 
 bool hasRunFailures(const Config& config, const BenchmarkResults& results)
@@ -957,7 +957,7 @@ bool hasRunFailures(const Config& config, const BenchmarkResults& results)
     return std::any_of(results.files.begin(), results.files.end(),
                        [&](const FileResult& file)
                        {
-                           const auto values = representatives(config, file);
+                           const auto values = summarizeGroups(config, file);
                            return values[0].state == ResultState::Invalid || values[1].state == ResultState::Invalid;
                        });
 }

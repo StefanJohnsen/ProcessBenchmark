@@ -18,7 +18,7 @@ struct ProcessConfig final
     std::string commandArguments;
 };
 
-struct ConverterGroup final
+struct ProcessGroup final
 {
     std::string name;
     std::vector<ProcessConfig> processes;
@@ -31,7 +31,7 @@ struct Config final
     size_t runsPerFile = 0;
     std::map<std::string, std::filesystem::path> engines;
     std::vector<std::filesystem::path> files;
-    std::vector<ConverterGroup> groups;
+    std::vector<ProcessGroup> groups;
 };
 
 struct BenchmarkOptions final
@@ -41,16 +41,16 @@ struct BenchmarkOptions final
     bool createReport = true;
 };
 
-struct InputFile final
+struct TestFile final
 {
-    std::filesystem::path source;
+    std::filesystem::path path;
     std::string extension;
-    uint64_t sourceBytes = 0;
+    uint64_t sizeBytes = 0;
 };
 
-struct InputPlan final
+struct BenchmarkPlan final
 {
-    std::vector<InputFile> files;
+    std::vector<TestFile> files;
 };
 
 struct RunResult final
@@ -65,7 +65,7 @@ struct RunResult final
 
 struct FileResult final
 {
-    InputFile input;
+    TestFile file;
     std::array<std::vector<RunResult>, GroupCount> groupRuns;
 };
 

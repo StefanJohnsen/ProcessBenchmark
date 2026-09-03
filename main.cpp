@@ -42,7 +42,7 @@ int wmain(const int argc, wchar_t* argv[])
 
         const auto& options = arguments.benchmarkOptions;
         const auto config = benchmark::loadConfig(arguments.configPath);
-        const auto plan = benchmark::buildInputPlan(config);
+        const auto plan = benchmark::buildBenchmarkPlan(config);
         const auto reportPath = createReportPath(config.configPath);
 
         std::cout << "Configuration validated successfully.\n"

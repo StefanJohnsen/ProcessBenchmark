@@ -113,7 +113,7 @@ struct ConsoleAggregate final
     std::array<uint64_t, GroupCount> peakWorkingSetBytes{};
 };
 
-static ConsoleAggregate consoleAggregate(const Config& config, const BenchmarkResults& results)
+static ConsoleAggregate calculateConsoleAggregate(const Config& config, const BenchmarkResults& results)
 {
     ConsoleAggregate aggregate;
     aggregate.totalFiles = results.files.size();
@@ -193,7 +193,7 @@ static std::string upperAscii(std::string value)
 static void printOverallPerformance(const Config& config, const BenchmarkResults& results,
                                     const BenchmarkOptions& options)
 {
-    const auto aggregate = consoleAggregate(config, results);
+    const auto aggregate = calculateConsoleAggregate(config, results);
     std::cout << "\nOverall Performance\n\nComparable files: " << aggregate.comparableFiles << '/'
               << aggregate.totalFiles << "\n\n";
     if (aggregate.comparableFiles == 0)
@@ -294,10 +294,10 @@ static ConsoleRunTable createConsoleRunTable(const Config& config, const Benchma
         table.widths.emplace_back(displayedWidth(header));
     for (const auto& file : results.files)
     {
-        table.widths[0] = std::max(
-            table.widths[0], displayedWidth(fitConsoleFileName(pathWithoutExtension(file.input.source.filename()))));
-        table.widths[1] = std::max(table.widths[1], displayedWidth(extensionWithoutDot(file.input.extension)));
-        table.widths[2] = std::max(table.widths[2], displayedWidth(formatBytes(file.input.sourceBytes)));
+        table.widths[0] = std::max(table.widths[0],
+                                   displayedWidth(fitConsoleFileName(pathWithoutExtension(file.file.path.filename()))));
+        table.widths[1] = std::max(table.widths[1], displayedWidth(extensionWithoutDot(file.file.extension)));
+        table.widths[2] = std::max(table.widths[2], displayedWidth(formatBytes(file.file.sizeBytes)));
     }
     for (const auto& group : config.groups)
         table.widths[3] = std::max(table.widths[3], displayedWidth(group.name));
@@ -339,8 +339,8 @@ static void printConsoleRunTableHeader(const ConsoleRunTable& table)
 static void printConsoleRun(const ConsoleRunTable& table, const Config& config, const FileResult& file,
                             const size_t groupIndex, const RunResult& run, const BenchmarkOptions& options)
 {
-    std::vector<std::string> row = {fitConsoleFileName(pathWithoutExtension(file.input.source.filename())),
-                                    extensionWithoutDot(file.input.extension), formatBytes(file.input.sourceBytes),
+    std::vector<std::string> row = {fitConsoleFileName(pathWithoutExtension(file.file.path.filename())),
+                                    extensionWithoutDot(file.file.extension), formatBytes(file.file.sizeBytes),
                                     config.groups[groupIndex].name, std::to_string(run.runNumber)};
     if (options.measureTime)
         row.emplace_back(formatDuration(run.elapsedMilliseconds));
@@ -359,13 +359,13 @@ static void printConsoleRun(const ConsoleRunTable& table, const Config& config, 
 }
 } // namespace
 
-int runBenchmark(const Config& config, const InputPlan& plan, const std::filesystem::path& reportPath,
+int runBenchmark(const Config& config, const BenchmarkPlan& plan, const std::filesystem::path& reportPath,
                  const BenchmarkOptions& options)
 {
     BenchmarkResults results;
     results.files.reserve(plan.files.size());
-    for (const auto& input : plan.files)
-        results.files.emplace_back(FileResult{.input = input});
+    for (const auto& file : plan.files)
+        results.files.emplace_back(FileResult{.file = file});
 
     if (options.createReport)
         writeMarkdownReport(config, results, reportPath, options);
@@ -386,7 +386,7 @@ int runBenchmark(const Config& config, const InputPlan& plan, const std::filesys
                     const auto& group = config.groups[groupIndex];
                     const auto& process = group.processes[fileIndex];
                     const auto& executable = config.engines.at(process.engineName);
-                    run = runConverter(executable, process.commandArguments, runNumber, options);
+                    run = runProcess(executable, process.commandArguments, runNumber, options);
                 }
                 catch (const std::exception& error)
                 {

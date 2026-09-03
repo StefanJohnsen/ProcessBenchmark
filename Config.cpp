@@ -128,7 +128,7 @@ Config loadConfig(const std::filesystem::path& configPath)
         throw std::runtime_error("Could not open text configuration: " + pathToUtf8(config.configPath));
 
     Section section = Section::None;
-    ConverterGroup* currentGroup = nullptr;
+    ProcessGroup* currentGroup = nullptr;
     std::string line;
     size_t lineNumber = 0;
     while (std::getline(stream, line))
@@ -173,7 +173,7 @@ Config loadConfig(const std::filesystem::path& configPath)
             const auto name = trim(text.substr(12));
             if (name.empty())
                 throw std::runtime_error("A process group name must not be empty.");
-            config.groups.emplace_back(ConverterGroup{.name = name});
+            config.groups.emplace_back(ProcessGroup{.name = name});
             currentGroup = &config.groups.back();
             section = Section::Processes;
             continue;
@@ -252,18 +252,18 @@ Config loadConfig(const std::filesystem::path& configPath)
     return config;
 }
 
-InputPlan buildInputPlan(const Config& config)
+BenchmarkPlan buildBenchmarkPlan(const Config& config)
 {
-    InputPlan plan;
+    BenchmarkPlan plan;
     for (size_t index = 0; index < config.files.size(); ++index)
     {
-        InputFile file;
-        file.source = config.files[index];
-        file.extension = lowerAscii(pathToUtf8(file.source.extension()));
+        TestFile file;
+        file.path = config.files[index];
+        file.extension = lowerAscii(pathToUtf8(file.path.extension()));
         std::error_code error;
-        file.sourceBytes = std::filesystem::file_size(file.source, error);
+        file.sizeBytes = std::filesystem::file_size(file.path, error);
         if (error)
-            throw std::runtime_error("Could not read input file size: " + pathToUtf8(file.source));
+            throw std::runtime_error("Could not read input file size: " + pathToUtf8(file.path));
         plan.files.emplace_back(std::move(file));
     }
     return plan;
