@@ -196,6 +196,13 @@ and comparisons. Regular report tables hide directory paths to make the results 
 `Configuration Used` section preserves the original configuration so the benchmark can be reproduced without having
 to archive every configuration file separately.
 
+### Minimal measurement impact
+
+Each engine runs as a separate process, one at a time, with no CPU or RAM limits imposed by ProcessBenchmark. The
+engine remains free to use its own threads and CPU cores. ProcessBenchmark only waits, records the run time and reads
+the RAM counter maintained by Windows, so measurement overhead is minimal. Using 3 to 5 runs and comparing medians
+helps smooth out normal variation from Windows and background activity.
+
 ### Measurement details
 
 Run time uses `std::chrono::steady_clock`. RAM is the direct process `PeakWorkingSetSize`; child-process memory
