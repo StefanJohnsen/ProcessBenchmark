@@ -269,8 +269,8 @@ static ConsoleRunTable createConsoleRunTable(const Config& config, const Benchma
                                              const BenchmarkOptions& options)
 {
     ConsoleRunTable table;
-    table.headers = {"File name", "Ext", "Group", "Run"};
-    table.alignments = {ConsoleAlignment::Left, ConsoleAlignment::Center,
+    table.headers = {"File name", "Ext", "Size", "Group", "Run"};
+    table.alignments = {ConsoleAlignment::Left, ConsoleAlignment::Center, ConsoleAlignment::Right,
                         ConsoleAlignment::Center, ConsoleAlignment::Center};
     if (options.measureTime)
     {
@@ -294,12 +294,13 @@ static ConsoleRunTable createConsoleRunTable(const Config& config, const Benchma
         table.widths[0] = std::max(table.widths[0], displayedWidth(
             fitConsoleFileName(pathWithoutExtension(file.input.relativeSource))));
         table.widths[1] = std::max(table.widths[1], displayedWidth(extensionWithoutDot(file.input.extension)));
+        table.widths[2] = std::max(table.widths[2], displayedWidth(formatBytes(file.input.sourceBytes)));
     }
     for (const auto& group : config.groups)
-        table.widths[2] = std::max(table.widths[2], displayedWidth(group.name));
-    table.widths[3] = std::max(table.widths[3], std::to_string(config.runsPerFile).size());
+        table.widths[3] = std::max(table.widths[3], displayedWidth(group.name));
+    table.widths[4] = std::max(table.widths[4], std::to_string(config.runsPerFile).size());
 
-    size_t metricIndex = 4;
+    size_t metricIndex = 5;
     if (options.measureTime)
     {
         table.widths[metricIndex] = std::max<size_t>(table.widths[metricIndex], 9);
@@ -337,7 +338,7 @@ static void printConsoleRun(const ConsoleRunTable& table, const Config& config, 
 {
     std::vector<std::string> row = {
         fitConsoleFileName(pathWithoutExtension(file.input.relativeSource)), extensionWithoutDot(file.input.extension),
-        config.groups[groupIndex].name, std::to_string(run.runNumber)};
+        formatBytes(file.input.sourceBytes), config.groups[groupIndex].name, std::to_string(run.runNumber)};
     if (options.measureTime)
         row.emplace_back(formatDuration(run.elapsedMilliseconds));
     if (options.measureMemory)

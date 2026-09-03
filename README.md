@@ -12,13 +12,6 @@ into a clear, reproducible Markdown report.
 - Reduce timing noise with repeated runs and median results.
 - Keep the original configuration together with the generated report.
 
-### Example result
-
-**TEST 2 IS 2.07x FASTER**<br>
-**TEST 1 USES 10.0% LESS RAM**
-
-The complete fictional report is shown at the end of this README.
-
 ## How it works
 
 1. Define the executables and files used by the test.
@@ -35,34 +28,49 @@ Open `ProcessBenchmark.sln` in Visual Studio 2022 and build the `Release | x64` 
 
 # Configuration
 
-Copy the ASCII [`config.example.txt`](config.example.txt) file, give the copy a descriptive name for your test, and
-adapt it to the processes you want to benchmark. For example, rename it to `processTest.txt`. The configuration
-tells ProcessBenchmark what to run:
+One readable text file describes the complete benchmark. No scripts or programming are required.
 
-1. Write the report title on the first line.
-2. Set `RUNS` to the number of repetitions, from 1 to 100. Using 3 to 5 runs is recommended for most benchmarks.
-   Repeated runs reduce the influence of a cold first start, system activity and temporary timing variations. The
-   report uses the median result, so one unusually slow or fast run has less influence on the comparison.
-3. Under `ENGINES`, add as many process engines as needed. Give each executable a short name and its absolute path.
-4. Under `FILES`, add as many test files as needed, using consecutive indices starting at `0`.
-5. Add exactly two `PROCESSES` groups. Give every input file one process row in each group, using the same indices.
+Start by copying [`config.example.txt`](config.example.txt), rename the copy to something meaningful such as
+`processTest.txt`, and replace the example values with your own.
 
-Each process row contains an index, an engine name and `Command Arguments`. Its index connects the row to the `FILES`
-entry with the same index. `Command Arguments` is free text and may contain any arguments, options, flags or paths
-accepted by the selected process. It may also be empty. File placeholders are optional. ProcessBenchmark replaces
-placeholders when present, then passes the complete expanded string directly to the executable without interpreting
-or rearranging its contents. Use double quotes when an individual argument contains spaces.
+You only need to describe three things:
 
-The matching `FILES` entry is the file identity used for measurements and report comparisons. It does not impose a
-particular position or role on the process's command arguments.
+- **Process engines** — the programs you want to test.
+- **Test files** — the common workload used for the comparison.
+- **Process groups** — two alternative ways to process the same files.
 
-Paths under `ENGINES` and `FILES` may use `/`, `\` or doubled `\\` separators and may optionally be enclosed in
-single or double quotes. ProcessBenchmark normalizes these paths internally. Text under `Command Arguments` is never
-normalized because it belongs to the selected process.
+Rows with the same index belong together. File `0` is used by process `0` in both groups, file `1` by process `1`, and
+so on. This keeps both sides of the comparison synchronized while allowing each group to use different engines,
+arguments and flags.
 
-ProcessBenchmark does not identify, create, validate or delete output files. A process may have no output argument at
-all. If your process requires an output path not to exist, remove old output yourself before starting the benchmark.
-A run succeeds when the process starts correctly, enabled measurements succeed and the process returns exit code `0`.
+### Create your benchmark
+
+1. Write a descriptive report title on the first line.
+2. Set `RUNS` from 1 to 100. Three to five runs normally give a useful comparison because repeated runs reduce the
+   influence of a cold first start, background activity and temporary timing variations. The report compares median
+   results, so one unusual run has less influence.
+3. Add as many entries as needed under `ENGINES`. Give each executable a short name and its absolute path.
+4. Add the test files under `FILES`, using consecutive indices beginning with `0`.
+5. Add exactly two `PROCESSES` groups. Each group needs one process row for every test file, using matching indices.
+
+### Command arguments
+
+Think of `Command Arguments` as the corresponding field in Visual Studio. Write any arguments, options, flags or paths
+accepted by the selected executable. The value may also be empty.
+
+Placeholders are optional. When used, ProcessBenchmark expands them with values from the matching `FILES` row and
+passes the resulting string directly to the executable. It does not interpret or rearrange the command. Use double
+quotes around an individual argument containing spaces.
+
+### Good to know
+
+- The matching `FILES` row identifies the file used for measurements and report comparisons. It does not require that
+  file to appear at a particular position in `Command Arguments`.
+- Paths under `ENGINES` and `FILES` may use `/`, `\` or doubled `\\` separators and may optionally use single or
+  double quotes. ProcessBenchmark normalizes these paths internally but never changes `Command Arguments`.
+- ProcessBenchmark does not identify, create, validate or delete output files. A process may have no output argument.
+  Create required directories and remove old output before the benchmark if your process needs that.
+- A run succeeds when the process starts, enabled measurements succeed and the process returns exit code `0`.
 
 ### Example configuration
 
