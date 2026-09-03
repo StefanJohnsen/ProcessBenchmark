@@ -19,11 +19,10 @@ namespace benchmark
 {
 namespace
 {
-static RunResult failedRun(const size_t runNumber, const size_t executionOrder, const std::string& error)
+static RunResult failedRun(const size_t runNumber, const std::string& error)
 {
     RunResult result;
     result.runNumber = runNumber;
-    result.executionOrder = executionOrder;
     result.error = error;
     return result;
 }
@@ -45,13 +44,17 @@ static std::string exitCodeText(const RunResult& run)
     return run.exitCode.has_value() ? std::to_string(run.exitCode.value()) : "N/A";
 }
 
-enum class ConsoleAlignment { Left, Center, Right };
+enum class ConsoleAlignment
+{
+    Left,
+    Center,
+    Right
+};
 
 static size_t displayedWidth(const std::string& value)
 {
     return static_cast<size_t>(std::count_if(value.begin(), value.end(),
-                                             [](const unsigned char character)
-                                             { return (character & 0xc0) != 0x80; }));
+                                             [](const unsigned char character) { return (character & 0xc0) != 0x80; }));
 }
 
 static std::string padded(const std::string& value, const size_t width, const ConsoleAlignment alignment)
@@ -68,8 +71,7 @@ static std::string padded(const std::string& value, const size_t width, const Co
     return std::string(left, ' ') + value + std::string(remaining - left, ' ');
 }
 
-static void printConsoleTable(const std::vector<std::string>& headers,
-                              const std::vector<ConsoleAlignment>& alignments,
+static void printConsoleTable(const std::vector<std::string>& headers, const std::vector<ConsoleAlignment>& alignments,
                               const std::vector<std::vector<std::string>>& rows)
 {
     std::vector<size_t> widths;
@@ -183,7 +185,7 @@ static std::string upperAscii(std::string value)
                    [](const unsigned char character)
                    {
                        return character >= 'a' && character <= 'z' ? static_cast<char>(character - 'a' + 'A')
-                                                                    : static_cast<char>(character);
+                                                                   : static_cast<char>(character);
                    });
     return value;
 }
@@ -202,9 +204,9 @@ static void printOverallPerformance(const Config& config, const BenchmarkResults
 
     std::cout << "Lower is better. Bars are normalized independently for each metric.\n\n";
     const std::vector<std::string> headers = {"Metric", "Group", "Usage", "Value", "Comp.", "BEST"};
-    const std::vector<ConsoleAlignment> alignments = {
-        ConsoleAlignment::Left, ConsoleAlignment::Left, ConsoleAlignment::Left,
-        ConsoleAlignment::Right, ConsoleAlignment::Right, ConsoleAlignment::Center};
+    const std::vector<ConsoleAlignment> alignments = {ConsoleAlignment::Left,  ConsoleAlignment::Left,
+                                                      ConsoleAlignment::Left,  ConsoleAlignment::Right,
+                                                      ConsoleAlignment::Right, ConsoleAlignment::Center};
     std::vector<std::vector<std::string>> rows;
 
     size_t timeWinner = 0;
@@ -238,18 +240,19 @@ static void printOverallPerformance(const Config& config, const BenchmarkResults
                                            static_cast<double>(maximum) * 100.0;
         memoryImprovement = formatPercent(improvement) + " less";
         for (size_t index = 0; index < GroupCount; ++index)
-            rows.push_back({"Highest median RAM", config.groups[index].name,
-                            consoleBar(static_cast<double>(aggregate.peakWorkingSetBytes[index]),
-                                       static_cast<double>(maximum)),
-                            formatMiB(aggregate.peakWorkingSetBytes[index]),
-                            memoryTie ? "0.0%" : (index == memoryWinner ? memoryImprovement : "-"),
-                            memoryTie || index == memoryWinner ? "\xf0\x9f\x9f\xa2" : ""});
+            rows.push_back(
+                {"Highest median RAM", config.groups[index].name,
+                 consoleBar(static_cast<double>(aggregate.peakWorkingSetBytes[index]), static_cast<double>(maximum)),
+                 formatMiB(aggregate.peakWorkingSetBytes[index]),
+                 memoryTie ? "0.0%" : (index == memoryWinner ? memoryImprovement : "-"),
+                 memoryTie || index == memoryWinner ? "\xf0\x9f\x9f\xa2" : ""});
     }
 
     printConsoleTable(headers, alignments, rows);
     if (options.measureTime)
-        std::cout << '\n' << (timeTie ? "SPEED: TIE"
-                                      : upperAscii(config.groups[timeWinner].name) + " IS " + timeFactor + " FASTER")
+        std::cout << '\n'
+                  << (timeTie ? "SPEED: TIE"
+                              : upperAscii(config.groups[timeWinner].name) + " IS " + timeFactor + " FASTER")
                   << '\n';
     if (options.measureMemory)
         std::cout << (memoryTie ? "RAM: TIE"
@@ -291,8 +294,8 @@ static ConsoleRunTable createConsoleRunTable(const Config& config, const Benchma
         table.widths.emplace_back(displayedWidth(header));
     for (const auto& file : results.files)
     {
-        table.widths[0] = std::max(table.widths[0], displayedWidth(
-            fitConsoleFileName(pathWithoutExtension(file.input.relativeSource))));
+        table.widths[0] = std::max(
+            table.widths[0], displayedWidth(fitConsoleFileName(pathWithoutExtension(file.input.source.filename()))));
         table.widths[1] = std::max(table.widths[1], displayedWidth(extensionWithoutDot(file.input.extension)));
         table.widths[2] = std::max(table.widths[2], displayedWidth(formatBytes(file.input.sourceBytes)));
     }
@@ -336,9 +339,9 @@ static void printConsoleRunTableHeader(const ConsoleRunTable& table)
 static void printConsoleRun(const ConsoleRunTable& table, const Config& config, const FileResult& file,
                             const size_t groupIndex, const RunResult& run, const BenchmarkOptions& options)
 {
-    std::vector<std::string> row = {
-        fitConsoleFileName(pathWithoutExtension(file.input.relativeSource)), extensionWithoutDot(file.input.extension),
-        formatBytes(file.input.sourceBytes), config.groups[groupIndex].name, std::to_string(run.runNumber)};
+    std::vector<std::string> row = {fitConsoleFileName(pathWithoutExtension(file.input.source.filename())),
+                                    extensionWithoutDot(file.input.extension), formatBytes(file.input.sourceBytes),
+                                    config.groups[groupIndex].name, std::to_string(run.runNumber)};
     if (options.measureTime)
         row.emplace_back(formatDuration(run.elapsedMilliseconds));
     if (options.measureMemory)
@@ -360,7 +363,6 @@ int runBenchmark(const Config& config, const InputPlan& plan, const std::filesys
                  const BenchmarkOptions& options)
 {
     BenchmarkResults results;
-    results.unsupportedFileCount = plan.unsupportedFileCount;
     results.files.reserve(plan.files.size());
     for (const auto& input : plan.files)
         results.files.emplace_back(FileResult{.input = input});
@@ -370,8 +372,6 @@ int runBenchmark(const Config& config, const InputPlan& plan, const std::filesys
 
     const auto consoleTable = createConsoleRunTable(config, results, options);
     printConsoleRunTableHeader(consoleTable);
-    size_t executionOrder = 0;
-
     for (size_t fileIndex = 0; fileIndex < results.files.size(); ++fileIndex)
     {
         auto& file = results.files[fileIndex];
@@ -380,19 +380,17 @@ int runBenchmark(const Config& config, const InputPlan& plan, const std::filesys
             for (size_t runIndex = 0; runIndex < config.runsPerFile; ++runIndex)
             {
                 const auto runNumber = runIndex + 1;
-                ++executionOrder;
-
                 RunResult run;
                 try
                 {
                     const auto& group = config.groups[groupIndex];
                     const auto& process = group.processes[fileIndex];
                     const auto& executable = config.engines.at(process.engineName);
-                    run = runConverter(executable, process.expandedArguments, runNumber, executionOrder, options);
+                    run = runConverter(executable, process.commandArguments, runNumber, options);
                 }
                 catch (const std::exception& error)
                 {
-                    run = failedRun(runNumber, executionOrder, error.what());
+                    run = failedRun(runNumber, error.what());
                 }
 
                 file.groupRuns[groupIndex].emplace_back(std::move(run));

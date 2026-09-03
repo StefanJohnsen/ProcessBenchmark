@@ -58,7 +58,8 @@ static std::string markdownText(std::string value)
 
 static void replaceText(std::string& value, const std::string& source, const std::string& replacement)
 {
-    if (source.empty()) return;
+    if (source.empty())
+        return;
     size_t position = 0;
     while ((position = value.find(source, position)) != std::string::npos)
     {
@@ -78,8 +79,13 @@ static std::string reportSafeText(const Config& config, std::string value)
         replaceText(value, slashPath, replacement);
     };
     hidePath(config.configPath);
-    for (const auto& file : config.files) hidePath(file);
-    for (const auto& [name, engine] : config.engines) { static_cast<void>(name); hidePath(engine); }
+    for (const auto& file : config.files)
+        hidePath(file);
+    for (const auto& [name, engine] : config.engines)
+    {
+        static_cast<void>(name);
+        hidePath(engine);
+    }
     return markdownText(std::move(value));
 }
 
@@ -95,7 +101,8 @@ static std::string registryString(HKEY key, const wchar_t* name)
     wchar_t value[512]{};
     DWORD type = 0;
     DWORD bytes = sizeof(value);
-    if (RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, &type, value, &bytes) != ERROR_SUCCESS) return "N/A";
+    if (RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, &type, value, &bytes) != ERROR_SUCCESS)
+        return "N/A";
     return pathToUtf8(std::filesystem::path(value));
 }
 
@@ -151,13 +158,16 @@ static size_t physicalCoreCount()
     DWORD bytes = 0;
     GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &bytes);
     std::vector<std::byte> buffer(bytes);
-    if (bytes == 0 || !GetLogicalProcessorInformationEx(RelationProcessorCore,
-        reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(buffer.data()), &bytes)) return 0;
+    if (bytes == 0 ||
+        !GetLogicalProcessorInformationEx(
+            RelationProcessorCore, reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(buffer.data()), &bytes))
+        return 0;
     size_t count = 0;
     for (DWORD offset = 0; offset < bytes;)
     {
         const auto* item = reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data() + offset);
-        if (item->Relationship == RelationProcessorCore) ++count;
+        if (item->Relationship == RelationProcessorCore)
+            ++count;
         offset += item->Size;
     }
     return count;
@@ -168,11 +178,13 @@ static std::string reportArguments(const std::string& arguments)
     const auto wide = pathFromUtf8(arguments).wstring();
     int count = 0;
     auto* values = CommandLineToArgvW(wide.c_str(), &count);
-    if (values == nullptr) return arguments;
+    if (values == nullptr)
+        return arguments;
     std::wstring result;
     for (int index = 0; index < count; ++index)
     {
-        if (index != 0) result.push_back(L' ');
+        if (index != 0)
+            result.push_back(L' ');
         std::filesystem::path value(values[index]);
         const auto visible = value.is_absolute() ? value.filename().wstring() : value.wstring();
         result += quoteWindowsArgument(visible);
@@ -188,7 +200,8 @@ static void writeHardware(std::ostringstream& report)
     const auto cpuName = cpu != nullptr ? registryString(cpu, L"ProcessorNameString") : "N/A";
     const auto vendor = cpu != nullptr ? registryString(cpu, L"VendorIdentifier") : "N/A";
     const auto mhz = cpu != nullptr ? registryDword(cpu, L"~MHz") : 0;
-    if (cpu != nullptr) RegCloseKey(cpu);
+    if (cpu != nullptr)
+        RegCloseKey(cpu);
 
     MEMORYSTATUSEX memory{};
     memory.dwLength = sizeof(memory);
@@ -206,13 +219,19 @@ static void writeHardware(std::ostringstream& report)
     report << "| Reported CPU clock | " << (mhz == 0 ? "N/A" : std::to_string(mhz) + " MHz") << " |\n";
     report << "| Installed memory | " << (installedOk ? formatBytes(installedKiB * 1024ULL) : "N/A") << " |\n";
     report << "| Usable physical memory | " << (memoryOk ? formatBytes(memory.ullTotalPhys) : "N/A") << " |\n";
-    report << "| Available physical memory at report time | " << (memoryOk ? formatBytes(memory.ullAvailPhys) : "N/A") << " |\n";
+    report << "| Available physical memory at report time | " << (memoryOk ? formatBytes(memory.ullAvailPhys) : "N/A")
+           << " |\n";
     report << "| Total page file limit | " << (memoryOk ? formatBytes(memory.ullTotalPageFile) : "N/A") << " |\n";
-    report << "| Memory load at report time | " << (memoryOk ? std::to_string(memory.dwMemoryLoad) + "%" : "N/A") << " |\n";
-    report << "| Native architecture | " << (system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? "x64" : "Other") << " |\n\n";
+    report << "| Memory load at report time | " << (memoryOk ? std::to_string(memory.dwMemoryLoad) + "%" : "N/A")
+           << " |\n";
+    report << "| Native architecture | "
+           << (system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? "x64" : "Other") << " |\n\n";
     report << "Memory values are collected with Microsoft's Windows APIs: "
-              "[GetPhysicallyInstalledSystemMemory](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getphysicallyinstalledsystemmemory) "
-              "and [GlobalMemoryStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-globalmemorystatusex).\n\n";
+              "[GetPhysicallyInstalledSystemMemory](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/"
+              "nf-sysinfoapi-getphysicallyinstalledsystemmemory) "
+              "and "
+              "[GlobalMemoryStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/"
+              "nf-sysinfoapi-globalmemorystatusex).\n\n";
 }
 
 static Representative representative(const std::vector<RunResult>& runs, const size_t expectedRuns)
@@ -326,8 +345,8 @@ static std::string lessComparison(const std::array<std::string, GroupCount>& gro
     if (values[loser] == 0)
         return "N/A";
 
-    const auto percentage = static_cast<double>(values[loser] - values[winner]) /
-                            static_cast<double>(values[loser]) * 100.0;
+    const auto percentage =
+        static_cast<double>(values[loser] - values[winner]) / static_cast<double>(values[loser]) * 100.0;
     return markdownText(groupNames[winner]) + ": " + formatPercent(percentage) + " less";
 }
 
@@ -402,8 +421,7 @@ static void writeAggregate(std::ostringstream& report, const Config& config, con
         for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
         {
             const auto formatted = formatDuration(value.elapsedMilliseconds[groupIndex]);
-            report << (includeBest &&
-                               value.elapsedMilliseconds[groupIndex] <= value.elapsedMilliseconds[1 - groupIndex]
+            report << (includeBest && value.elapsedMilliseconds[groupIndex] <= value.elapsedMilliseconds[1 - groupIndex]
                            ? bestValue(formatted)
                            : formatted)
                    << " | ";
@@ -427,8 +445,7 @@ static void writeAggregate(std::ostringstream& report, const Config& config, con
         for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
         {
             const auto formatted = formatMiB(value.peakWorkingSetBytes[groupIndex]);
-            report << (includeBest &&
-                               value.peakWorkingSetBytes[groupIndex] <= value.peakWorkingSetBytes[1 - groupIndex]
+            report << (includeBest && value.peakWorkingSetBytes[groupIndex] <= value.peakWorkingSetBytes[1 - groupIndex]
                            ? bestValue(formatted)
                            : formatted)
                    << " | ";
@@ -538,10 +555,10 @@ static void writeVisualComparison(std::ostringstream& report, const Config& conf
         const auto maximum = static_cast<double>(std::max(value.peakWorkingSetBytes[0], value.peakWorkingSetBytes[1]));
         const auto winner = value.peakWorkingSetBytes[0] < value.peakWorkingSetBytes[1] ? 0U : 1U;
         const auto tie = value.peakWorkingSetBytes[0] == value.peakWorkingSetBytes[1];
-        const auto improvement = tie || maximum <= 0.0
-                                     ? 0.0
-                                     : (maximum - static_cast<double>(value.peakWorkingSetBytes[winner])) / maximum *
-                                           100.0;
+        const auto improvement =
+            tie || maximum <= 0.0
+                ? 0.0
+                : (maximum - static_cast<double>(value.peakWorkingSetBytes[winner])) / maximum * 100.0;
         for (size_t index = 0; index < GroupCount; ++index)
         {
             report << "| Highest median RAM | " << markdownText(config.groups[index].name) << " | "
@@ -575,7 +592,8 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
     report << "This benchmark compares **" << config.groups.size() << " process groups** across **"
            << config.files.size() << " input files**. Each configured process is run **" << config.runsPerFile << ' '
            << (config.runsPerFile == 1 ? "time" : "times") << "** for each process group, for a total of **"
-           << totalPlannedRuns << " planned process runs**. Processes execute sequentially, one at a time, so they "
+           << totalPlannedRuns
+           << " planned process runs**. Processes execute sequentially, one at a time, so they "
               "do not compete with another benchmarked process for CPU or memory during measurement.\n\n";
     if (!results.completed)
         report << "> **In progress - results are incomplete.**\n\n";
@@ -601,7 +619,7 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
         report << "| Index | Engine | Command Arguments |\n|---:|---|---|\n";
         for (size_t index = 0; index < group.processes.size(); ++index)
             report << "| " << index << " | " << markdownText(group.processes[index].engineName) << " | "
-                   << markdownCode(reportSafeText(config, reportArguments(group.processes[index].expandedArguments)))
+                   << markdownCode(reportSafeText(config, reportArguments(group.processes[index].commandArguments)))
                    << " |\n";
         report << '\n';
     }
@@ -630,7 +648,8 @@ static void writeIntroduction(std::ostringstream& report, const Config& config, 
     if (options.measureMemory)
     {
         report << "<br>\n\n### Memory Measurement\n\n";
-        report << "RAM columns in result tables show the highest resident physical memory usage. It is read with Microsoft's "
+        report << "RAM columns in result tables show the highest resident physical memory usage. It is read with "
+                  "Microsoft's "
                   "[GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/"
                   "nf-psapi-getprocessmemoryinfo) from the direct process. `PeakWorkingSetSize` is "
                   "maintained by Windows as the highest amount of resident physical memory during the run. "
@@ -653,13 +672,11 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
     report << "| File name | Ext | ";
     if (options.measureTime)
     {
-        report << markdownText(names[0]) << " time | " << markdownText(names[1])
-               << " time | Time comp. | ";
+        report << markdownText(names[0]) << " time | " << markdownText(names[1]) << " time | Time comp. | ";
     }
     if (options.measureMemory)
     {
-        report << markdownText(names[0]) << " RAM | " << markdownText(names[1])
-               << " RAM | RAM comp. | ";
+        report << markdownText(names[0]) << " RAM | " << markdownText(names[1]) << " RAM | RAM comp. | ";
     }
     report << "Status |\n|---|:---:|";
     if (options.measureTime)
@@ -671,8 +688,8 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
     for (const auto* file : files)
     {
         const auto values = representatives(config, *file);
-        report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->input.relativeSource.filename())))
-               << " | " << markdownCode(extensionWithoutDot(file->input.extension)) << " | ";
+        report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->input.source.filename()))) << " | "
+               << markdownCode(extensionWithoutDot(file->input.extension)) << " | ";
         if (!comparable(values))
         {
             if (options.measureTime)
@@ -763,7 +780,8 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
             }
         }
     }
-    const auto fastestDisplayed = fastestRun == nullptr ? std::string{} : formatDuration(fastestRun->elapsedMilliseconds);
+    const auto fastestDisplayed =
+        fastestRun == nullptr ? std::string{} : formatDuration(fastestRun->elapsedMilliseconds);
     const auto lowestMemoryDisplayed =
         lowestMemoryRun == nullptr ? std::string{} : formatMiB(lowestMemoryRun->peakWorkingSetBytes);
 
@@ -779,8 +797,7 @@ static void writeFileType(std::ostringstream& report, const Config& config, cons
                 const bool hasBestMemory =
                     run.success && options.measureMemory && displayedMemory == lowestMemoryDisplayed;
                 const bool isBestRow = hasBestTime || hasBestMemory;
-                const auto fileName =
-                    markdownCode(pathToUtf8(pathWithoutExtension(file->input.relativeSource.filename())));
+                const auto fileName = markdownCode(pathToUtf8(pathWithoutExtension(file->input.source.filename())));
                 const auto extensionText = markdownCode(extensionWithoutDot(file->input.extension));
                 const auto groupName = markdownText(names[groupIndex]);
                 const auto runNumber = std::to_string(run.runNumber);
@@ -825,7 +842,7 @@ static void writeFailures(std::ostringstream& report, const Config& config, cons
                     wroteHeading = true;
                 }
 
-                report << "- " << markdownCode(pathToUtf8(file.input.relativeSource)) << ", group **"
+                report << "- " << markdownCode(pathToUtf8(file.input.source.filename())) << ", group **"
                        << markdownText(config.groups[groupIndex].name) << "**, run " << run.runNumber << ": "
                        << reportSafeText(config, run.error.empty() ? "Unknown error." : run.error);
                 report << '\n';
@@ -860,9 +877,11 @@ static void writeConfigurationUsed(std::ostringstream& report, const Config& con
         throw std::runtime_error("Configuration appendix must contain only ASCII characters.");
 
     std::string fence = "```";
-    while (text.find(fence) != std::string::npos) fence.push_back('`');
+    while (text.find(fence) != std::string::npos)
+        fence.push_back('`');
     report << "<br>\n<br>\n\n# Configuration Used\n\n" << fence << "text\n" << text;
-    if (text.empty() || text.back() != '\n') report << '\n';
+    if (text.empty() || text.back() != '\n')
+        report << '\n';
     report << fence << '\n';
 }
 
@@ -914,8 +933,8 @@ void writeMarkdownReport(const Config& config, const BenchmarkResults& results, 
     report << "Comparable files: **" << overall.comparableFiles << '/' << overall.totalFiles << "**\n\n";
     if (overall.invalidFiles[0] != 0 || overall.invalidFiles[1] != 0)
     {
-        report << "Invalid files: " << markdownText(config.groups[0].name) << " **" << overall.invalidFiles[0]
-               << "**, " << markdownText(config.groups[1].name) << " **" << overall.invalidFiles[1] << "**\n\n";
+        report << "Invalid files: " << markdownText(config.groups[0].name) << " **" << overall.invalidFiles[0] << "**, "
+               << markdownText(config.groups[1].name) << " **" << overall.invalidFiles[1] << "**\n\n";
     }
     writeVisualComparison(report, config, overall, options);
     writeOverallPunchline(report, config, overall, options);

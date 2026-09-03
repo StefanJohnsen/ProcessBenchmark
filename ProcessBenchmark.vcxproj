@@ -58,7 +58,6 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/Zc:__cplusplus /permissive- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
-    <Link><AdditionalDependencies>Shell32.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -77,7 +76,6 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <AdditionalOptions>/Zc:__cplusplus /permissive- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
-    <Link><AdditionalDependencies>Shell32.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>

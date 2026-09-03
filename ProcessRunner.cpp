@@ -180,11 +180,10 @@ static std::wstring buildCommandLine(const std::filesystem::path& executable, co
 } // namespace
 
 RunResult runConverter(const std::filesystem::path& executable, const std::string& commandArguments,
-                       const size_t runNumber, const size_t executionOrder, const BenchmarkOptions& options)
+                       const size_t runNumber, const BenchmarkOptions& options)
 {
     RunResult result;
     result.runNumber = runNumber;
-    result.executionOrder = executionOrder;
 
     SECURITY_ATTRIBUTES security{};
     security.nLength = sizeof(security);

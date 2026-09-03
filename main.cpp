@@ -47,7 +47,6 @@ int wmain(const int argc, wchar_t* argv[])
 
         std::cout << "Configuration validated successfully.\n"
                   << "Supported input files: " << plan.files.size() << '\n'
-                  << "Unsupported input files skipped: " << plan.unsupportedFileCount << '\n'
                   << "Runs per file and group: " << config.runsPerFile << '\n'
                   << "Measurements: "
                   << (options.measureTime && options.measureMemory

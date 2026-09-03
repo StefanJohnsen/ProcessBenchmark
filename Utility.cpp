@@ -3,11 +3,8 @@
 #include <Windows.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <ctime>
 #include <iomanip>
-#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -55,14 +52,14 @@ static std::string wideToUtf8(const std::wstring& value)
     return result;
 }
 
-static std::tm localTime()
+static std::filesystem::path absoluteLexicalPath(const std::filesystem::path& value)
 {
-    const auto now = std::chrono::system_clock::now();
-    const auto value = std::chrono::system_clock::to_time_t(now);
-    std::tm result{};
-    if (localtime_s(&result, &value) != 0)
-        throw std::runtime_error("Could not obtain the local time.");
-    return result;
+    std::error_code error;
+    auto result = std::filesystem::absolute(value, error);
+    if (error)
+        throw std::runtime_error("Could not resolve absolute path: " + pathToUtf8(value));
+
+    return result.lexically_normal();
 }
 } // namespace
 
@@ -101,16 +98,6 @@ std::string extensionWithoutDot(std::string value)
     return value;
 }
 
-std::filesystem::path absoluteLexicalPath(const std::filesystem::path& value)
-{
-    std::error_code error;
-    auto result = std::filesystem::absolute(value, error);
-    if (error)
-        throw std::runtime_error("Could not resolve absolute path: " + pathToUtf8(value));
-
-    return result.lexically_normal();
-}
-
 std::filesystem::path normalizeAbsolutePath(const std::filesystem::path& value)
 {
     std::error_code error;
@@ -121,63 +108,6 @@ std::filesystem::path normalizeAbsolutePath(const std::filesystem::path& value)
         result = canonical;
 
     return result.lexically_normal();
-}
-
-std::wstring foldWindowsCase(const std::wstring& value)
-{
-    if (value.empty())
-        return {};
-    if (value.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
-        throw std::runtime_error("A Windows path is too long to normalize.");
-
-    const auto sourceLength = static_cast<int>(value.size());
-    const auto resultLength = LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_UPPERCASE, value.data(), sourceLength, nullptr,
-                                            0, nullptr, nullptr, 0);
-    if (resultLength <= 0)
-        throw std::runtime_error("Could not normalize Windows path casing: " + windowsErrorMessage(GetLastError()));
-
-    std::wstring result(static_cast<size_t>(resultLength), L'\0');
-    if (LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_UPPERCASE, value.data(), sourceLength, result.data(), resultLength,
-                      nullptr, nullptr, 0) != resultLength)
-    {
-        throw std::runtime_error("Could not normalize Windows path casing: " + windowsErrorMessage(GetLastError()));
-    }
-    return result;
-}
-
-std::wstring normalizedPathKey(const std::filesystem::path& value)
-{
-    return foldWindowsCase(normalizeAbsolutePath(value).generic_wstring());
-}
-
-bool samePath(const std::filesystem::path& left, const std::filesystem::path& right)
-{
-    return normalizedPathKey(left) == normalizedPathKey(right);
-}
-
-bool pathWithin(const std::filesystem::path& value, const std::filesystem::path& directory)
-{
-    const auto valueKey = normalizedPathKey(value);
-    auto directoryKey = normalizedPathKey(directory);
-
-    if (valueKey == directoryKey)
-        return true;
-
-    if (!directoryKey.empty() && directoryKey.back() != L'/')
-        directoryKey.push_back(L'/');
-
-    return valueKey.rfind(directoryKey, 0) == 0;
-}
-
-bool pathsOverlap(const std::filesystem::path& left, const std::filesystem::path& right)
-{
-    return pathWithin(left, right) || pathWithin(right, left);
-}
-
-bool isFilesystemRoot(const std::filesystem::path& value)
-{
-    const auto normalized = normalizeAbsolutePath(value);
-    return samePath(normalized, normalized.root_path());
 }
 
 std::wstring quoteWindowsArgument(const std::wstring& value)
@@ -236,22 +166,6 @@ std::string windowsErrorMessage(const uint32_t errorCode)
         message.pop_back();
 
     return wideToUtf8(message) + " (Windows error " + std::to_string(errorCode) + ")";
-}
-
-std::string timestampForFileName()
-{
-    const auto value = localTime();
-    std::ostringstream stream;
-    stream << std::put_time(&value, "%Y%m%d-%H%M%S");
-    return stream.str();
-}
-
-std::string timestampForReport()
-{
-    const auto value = localTime();
-    std::ostringstream stream;
-    stream << std::put_time(&value, "%Y-%m-%d %H:%M:%S");
-    return stream.str();
 }
 
 std::string formatDuration(const double milliseconds)
