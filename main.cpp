@@ -3,8 +3,6 @@
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
-#include <string>
-#include <utility>
 
 #include "Benchmark.h"
 #include "CmdArgs.h"

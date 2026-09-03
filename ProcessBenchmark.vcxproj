@@ -87,18 +87,23 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Benchmark.cpp" />
+    <ClCompile Include="CmdArgs.cpp" />
     <ClCompile Include="Config.cpp" />
+    <ClCompile Include="Hardware.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ProcessRunner.cpp" />
     <ClCompile Include="Report.cpp" />
+    <ClCompile Include="Statistics.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Benchmark.h" />
     <ClInclude Include="Config.h" />
+    <ClInclude Include="Hardware.h" />
     <ClInclude Include="CmdArgs.h" />
     <ClInclude Include="ProcessRunner.h" />
     <ClInclude Include="Report.h" />
+    <ClInclude Include="Statistics.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>

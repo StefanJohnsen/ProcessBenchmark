@@ -16,6 +16,9 @@ namespace benchmark
 {
 namespace
 {
+inline constexpr size_t JobDrainMaxAttempts = 100;
+inline constexpr DWORD JobDrainPollIntervalMilliseconds = 10;
+
 class UniqueHandle final
 {
   public:
@@ -135,7 +138,7 @@ static void appendError(RunResult& result, const std::string& error)
 
 static bool waitForJobToBecomeEmpty(const HANDLE job)
 {
-    for (size_t attempt = 0; attempt < 100; ++attempt)
+    for (size_t attempt = 0; attempt < JobDrainMaxAttempts; ++attempt)
     {
         JOBOBJECT_BASIC_ACCOUNTING_INFORMATION information{};
         if (!QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &information, sizeof(information),
@@ -145,7 +148,7 @@ static bool waitForJobToBecomeEmpty(const HANDLE job)
         }
         if (information.ActiveProcesses == 0)
             return true;
-        Sleep(10);
+        Sleep(JobDrainPollIntervalMilliseconds);
     }
 
     return false;

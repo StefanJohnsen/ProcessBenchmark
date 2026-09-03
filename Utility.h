@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace benchmark
@@ -20,6 +19,7 @@ std::string formatDuration(double milliseconds);
 std::string formatMiB(uint64_t bytes);
 std::string formatBytes(uint64_t bytes);
 std::string formatPercent(double value);
+std::string formatRatio(double value);
 double median(std::vector<double> values);
 uint64_t median(std::vector<uint64_t> values);
 std::string markdownCode(std::string value);

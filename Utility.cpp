@@ -224,6 +224,15 @@ std::string formatPercent(const double value)
     return stream.str();
 }
 
+std::string formatRatio(const double value)
+{
+    if (value <= 0.0)
+        return "N/A";
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(2) << value << 'x';
+    return stream.str();
+}
+
 double median(std::vector<double> values)
 {
     if (values.empty())

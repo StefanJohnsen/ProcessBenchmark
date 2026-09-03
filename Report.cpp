@@ -8,41 +8,19 @@
 #include <fstream>
 #include <iomanip>
 #include <map>
-#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 
 #include "CmdArgs.h"
+#include "Hardware.h"
+#include "Statistics.h"
 #include "Utility.h"
 
 namespace benchmark
 {
 namespace
 {
-enum class ResultState
-{
-    Pending,
-    Valid,
-    Invalid
-};
-
-struct RunSummary final
-{
-    ResultState state = ResultState::Pending;
-    double elapsedMilliseconds = 0.0;
-    uint64_t peakWorkingSetBytes = 0;
-};
-
-struct AggregateResult final
-{
-    size_t totalFiles = 0;
-    size_t comparableFiles = 0;
-    std::array<size_t, GroupCount> invalidFiles{};
-    std::array<double, GroupCount> elapsedMilliseconds{};
-    std::array<uint64_t, GroupCount> peakWorkingSetBytes{};
-};
-
 static std::string markdownText(std::string value)
 {
     size_t position = 0;
@@ -96,16 +74,6 @@ static std::string exitCodeText(const RunResult& run)
     return std::to_string(run.exitCode.value());
 }
 
-static std::string registryString(HKEY key, const wchar_t* name)
-{
-    wchar_t value[512]{};
-    DWORD type = 0;
-    DWORD bytes = sizeof(value);
-    if (RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, &type, value, &bytes) != ERROR_SUCCESS)
-        return "N/A";
-    return pathToUtf8(std::filesystem::path(value));
-}
-
 static std::string upperAscii(std::string value)
 {
     std::transform(value.begin(), value.end(), value.begin(),
@@ -116,13 +84,6 @@ static std::string upperAscii(std::string value)
                        return static_cast<char>(character);
                    });
     return value;
-}
-
-static std::string formatRatio(const double value)
-{
-    std::ostringstream stream;
-    stream << std::fixed << std::setprecision(2) << value << 'x';
-    return stream.str();
 }
 
 static std::string localReportTime()
@@ -144,33 +105,6 @@ static std::string localReportTime()
     stream << std::setfill('0') << std::setw(4) << time.wYear << '-' << std::setw(2) << time.wMonth << '-'
            << std::setw(2) << time.wDay << ' ' << std::setw(2) << time.wHour << ':' << std::setw(2) << time.wMinute;
     return stream.str();
-}
-
-static uint64_t registryDword(HKEY key, const wchar_t* name)
-{
-    DWORD value = 0;
-    DWORD bytes = sizeof(value);
-    return RegGetValueW(key, nullptr, name, RRF_RT_REG_DWORD, nullptr, &value, &bytes) == ERROR_SUCCESS ? value : 0;
-}
-
-static size_t physicalCoreCount()
-{
-    DWORD bytes = 0;
-    GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &bytes);
-    std::vector<std::byte> buffer(bytes);
-    if (bytes == 0 ||
-        !GetLogicalProcessorInformationEx(
-            RelationProcessorCore, reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(buffer.data()), &bytes))
-        return 0;
-    size_t count = 0;
-    for (DWORD offset = 0; offset < bytes;)
-    {
-        const auto* item = reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data() + offset);
-        if (item->Relationship == RelationProcessorCore)
-            ++count;
-        offset += item->Size;
-    }
-    return count;
 }
 
 static std::string formatArgumentsForReport(const std::string& arguments)
@@ -195,37 +129,20 @@ static std::string formatArgumentsForReport(const std::string& arguments)
 
 static void writeHardware(std::ostringstream& report)
 {
-    HKEY cpu = nullptr;
-    RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &cpu);
-    const auto cpuName = cpu != nullptr ? registryString(cpu, L"ProcessorNameString") : "N/A";
-    const auto vendor = cpu != nullptr ? registryString(cpu, L"VendorIdentifier") : "N/A";
-    const auto mhz = cpu != nullptr ? registryDword(cpu, L"~MHz") : 0;
-    if (cpu != nullptr)
-        RegCloseKey(cpu);
-
-    MEMORYSTATUSEX memory{};
-    memory.dwLength = sizeof(memory);
-    const bool memoryOk = GlobalMemoryStatusEx(&memory) != FALSE;
-    ULONGLONG installedKiB = 0;
-    const bool installedOk = GetPhysicallyInstalledSystemMemory(&installedKiB) != FALSE;
-    SYSTEM_INFO system{};
-    GetNativeSystemInfo(&system);
+    const auto hardware = collectHardwareInfo();
 
     report << "<br>\n\n## Benchmark Hardware\n\n| Component | Value |\n|---|---|\n";
-    report << "| CPU | " << markdownText(cpuName) << " |\n";
-    report << "| CPU vendor | " << markdownText(vendor) << " |\n";
-    report << "| Physical cores | " << physicalCoreCount() << " |\n";
-    report << "| Logical processors | " << GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) << " |\n";
-    report << "| Reported CPU clock | " << (mhz == 0 ? "N/A" : std::to_string(mhz) + " MHz") << " |\n";
-    report << "| Installed memory | " << (installedOk ? formatBytes(installedKiB * 1024ULL) : "N/A") << " |\n";
-    report << "| Usable physical memory | " << (memoryOk ? formatBytes(memory.ullTotalPhys) : "N/A") << " |\n";
-    report << "| Available physical memory at report time | " << (memoryOk ? formatBytes(memory.ullAvailPhys) : "N/A")
-           << " |\n";
-    report << "| Total page file limit | " << (memoryOk ? formatBytes(memory.ullTotalPageFile) : "N/A") << " |\n";
-    report << "| Memory load at report time | " << (memoryOk ? std::to_string(memory.dwMemoryLoad) + "%" : "N/A")
-           << " |\n";
-    report << "| Native architecture | "
-           << (system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? "x64" : "Other") << " |\n\n";
+    report << "| CPU | " << markdownText(hardware.cpuName) << " |\n";
+    report << "| CPU vendor | " << markdownText(hardware.cpuVendor) << " |\n";
+    report << "| Physical cores | " << hardware.physicalCores << " |\n";
+    report << "| Logical processors | " << hardware.logicalProcessors << " |\n";
+    report << "| Reported CPU clock | " << hardware.cpuClock << " |\n";
+    report << "| Installed memory | " << hardware.installedMemory << " |\n";
+    report << "| Usable physical memory | " << hardware.usableMemory << " |\n";
+    report << "| Available physical memory at report time | " << hardware.availableMemory << " |\n";
+    report << "| Total page file limit | " << hardware.pageFileLimit << " |\n";
+    report << "| Memory load at report time | " << hardware.memoryLoad << " |\n";
+    report << "| Native architecture | " << hardware.architecture << " |\n\n";
     report << "Memory values are collected with Microsoft's Windows APIs: "
               "[GetPhysicallyInstalledSystemMemory](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/"
               "nf-sysinfoapi-getphysicallyinstalledsystemmemory) "
@@ -234,49 +151,9 @@ static void writeHardware(std::ostringstream& report)
               "nf-sysinfoapi-globalmemorystatusex).\n\n";
 }
 
-static RunSummary summarizeRuns(const std::vector<RunResult>& runs, const size_t expectedRuns)
-{
-    RunSummary result;
-    if (runs.size() < expectedRuns)
-        return result;
-
-    if (runs.size() != expectedRuns ||
-        std::any_of(runs.begin(), runs.end(), [](const RunResult& run) { return !run.success; }))
-    {
-        result.state = ResultState::Invalid;
-        return result;
-    }
-
-    std::vector<double> elapsed;
-    std::vector<uint64_t> workingSet;
-    elapsed.reserve(runs.size());
-    workingSet.reserve(runs.size());
-
-    for (const auto& run : runs)
-    {
-        elapsed.emplace_back(run.elapsedMilliseconds);
-        workingSet.emplace_back(run.peakWorkingSetBytes);
-    }
-
-    result.state = ResultState::Valid;
-    result.elapsedMilliseconds = median(std::move(elapsed));
-    result.peakWorkingSetBytes = median(std::move(workingSet));
-    return result;
-}
-
-static std::array<RunSummary, GroupCount> summarizeGroups(const Config& config, const FileResult& file)
-{
-    return {summarizeRuns(file.groupRuns[0], config.runsPerFile), summarizeRuns(file.groupRuns[1], config.runsPerFile)};
-}
-
-static bool comparable(const std::array<RunSummary, GroupCount>& values)
-{
-    return values[0].state == ResultState::Valid && values[1].state == ResultState::Valid;
-}
-
 static std::string stateText(const std::array<RunSummary, GroupCount>& values)
 {
-    if (comparable(values))
+    if (isComparable(values))
         return "Comparable";
     if (values[0].state == ResultState::Pending || values[1].state == ResultState::Pending)
         return "Pending";
@@ -287,100 +164,52 @@ static std::string lowerComparison(const std::array<std::string, GroupCount>& gr
                                    const std::array<double, GroupCount>& values, const std::string& metricDescription,
                                    const bool includeSpeedup)
 {
-    if (values[0] == values[1])
+    const auto comparison = compareLower(values[0], values[1]);
+    if (comparison.tie)
         return "Tie";
 
-    const size_t winner = values[0] < values[1] ? 0 : 1;
-    const size_t loser = 1 - winner;
-    const auto percentage = (values[loser] - values[winner]) / values[loser] * 100.0;
-
-    auto result = markdownText(groupNames[winner]) + ": " + formatPercent(percentage) + " lower " + metricDescription;
-    if (includeSpeedup && values[winner] > 0.0)
-    {
-        std::ostringstream speedup;
-        speedup << std::fixed << std::setprecision(2) << values[loser] / values[winner];
-        result += " (" + speedup.str() + "x speedup)";
-    }
+    auto result = markdownText(groupNames[comparison.winner]) + ": " + formatPercent(comparison.percentLess) +
+                  " lower " + metricDescription;
+    if (includeSpeedup && comparison.factor > 0.0)
+        result += " (" + formatRatio(comparison.factor) + " speedup)";
     return result;
 }
 
 static std::string lowerComparison(const std::array<std::string, GroupCount>& groupNames,
                                    const std::array<uint64_t, GroupCount>& values, const std::string& metricDescription)
 {
-    if (values[0] == values[1])
+    const auto comparison = compareLower(static_cast<double>(values[0]), static_cast<double>(values[1]));
+    if (comparison.tie)
         return "Tie";
-
-    const size_t winner = values[0] < values[1] ? 0 : 1;
-    const size_t loser = 1 - winner;
-    const auto percentage =
-        static_cast<double>(values[loser] - values[winner]) / static_cast<double>(values[loser]) * 100.0;
-    return markdownText(groupNames[winner]) + ": " + formatPercent(percentage) + " less " + metricDescription;
+    return markdownText(groupNames[comparison.winner]) + ": " + formatPercent(comparison.percentLess) + " less " +
+           metricDescription;
 }
 
 static std::string fasterComparison(const std::array<std::string, GroupCount>& groupNames,
                                     const std::array<double, GroupCount>& values)
 {
-    if (values[0] == values[1])
+    const auto comparison = compareLower(values[0], values[1]);
+    if (comparison.tie)
         return "Tie";
-
-    const size_t winner = values[0] < values[1] ? 0 : 1;
-    const size_t loser = 1 - winner;
-    if (values[winner] <= 0.0)
+    if (comparison.factor <= 0.0)
         return "N/A";
-
-    std::ostringstream speedup;
-    speedup << std::fixed << std::setprecision(2) << values[loser] / values[winner];
-    return markdownText(groupNames[winner]) + ": " + speedup.str() + "x faster";
+    return markdownText(groupNames[comparison.winner]) + ": " + formatRatio(comparison.factor) + " faster";
 }
 
 static std::string lessComparison(const std::array<std::string, GroupCount>& groupNames,
                                   const std::array<uint64_t, GroupCount>& values)
 {
-    if (values[0] == values[1])
+    const auto comparison = compareLower(static_cast<double>(values[0]), static_cast<double>(values[1]));
+    if (comparison.tie)
         return "Tie";
-
-    const size_t winner = values[0] < values[1] ? 0 : 1;
-    const size_t loser = 1 - winner;
-    if (values[loser] == 0)
+    if (comparison.percentLess <= 0.0)
         return "N/A";
-
-    const auto percentage =
-        static_cast<double>(values[loser] - values[winner]) / static_cast<double>(values[loser]) * 100.0;
-    return markdownText(groupNames[winner]) + ": " + formatPercent(percentage) + " less";
+    return markdownText(groupNames[comparison.winner]) + ": " + formatPercent(comparison.percentLess) + " less";
 }
 
 static std::string bestValue(const std::string& value)
 {
     return "**" + value + "**";
-}
-
-static AggregateResult calculateAggregate(const Config& config, const std::vector<const FileResult*>& files)
-{
-    AggregateResult result;
-    result.totalFiles = files.size();
-
-    for (const auto* file : files)
-    {
-        const auto values = summarizeGroups(config, *file);
-        for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
-        {
-            if (values[groupIndex].state == ResultState::Invalid)
-                ++result.invalidFiles[groupIndex];
-        }
-
-        if (!comparable(values))
-            continue;
-
-        ++result.comparableFiles;
-        for (size_t groupIndex = 0; groupIndex < GroupCount; ++groupIndex)
-        {
-            result.elapsedMilliseconds[groupIndex] += values[groupIndex].elapsedMilliseconds;
-            result.peakWorkingSetBytes[groupIndex] =
-                std::max(result.peakWorkingSetBytes[groupIndex], values[groupIndex].peakWorkingSetBytes);
-        }
-    }
-
-    return result;
 }
 
 static void writeAggregate(std::ostringstream& report, const Config& config, const AggregateResult& value,
@@ -474,32 +303,23 @@ static void writeOverallPunchline(std::ostringstream& report, const Config& conf
     const std::array<std::string, GroupCount> names = {config.groups[0].name, config.groups[1].name};
     if (options.measureTime && value.elapsedMilliseconds[0] > 0.0 && value.elapsedMilliseconds[1] > 0.0)
     {
-        if (value.elapsedMilliseconds[0] == value.elapsedMilliseconds[1])
+        const auto comparison = compareLower(value.elapsedMilliseconds[0], value.elapsedMilliseconds[1]);
+        if (comparison.tie)
             report << "### **SPEED: TIE**\n\n";
         else
-        {
-            const size_t winner = value.elapsedMilliseconds[0] < value.elapsedMilliseconds[1] ? 0 : 1;
-            const size_t loser = 1 - winner;
-            report << "### **" << upperAscii(markdownText(names[winner])) << " IS "
-                   << formatRatio(value.elapsedMilliseconds[loser] / value.elapsedMilliseconds[winner])
-                   << " FASTER**\n\n";
-        }
+            report << "### **" << upperAscii(markdownText(names[comparison.winner])) << " IS "
+                   << formatRatio(comparison.factor) << " FASTER**\n\n";
     }
 
     if (options.measureMemory && value.peakWorkingSetBytes[0] > 0 && value.peakWorkingSetBytes[1] > 0)
     {
-        if (value.peakWorkingSetBytes[0] == value.peakWorkingSetBytes[1])
+        const auto comparison = compareLower(static_cast<double>(value.peakWorkingSetBytes[0]),
+                                             static_cast<double>(value.peakWorkingSetBytes[1]));
+        if (comparison.tie)
             report << "### **RAM: TIE**\n\n";
         else
-        {
-            const size_t winner = value.peakWorkingSetBytes[0] < value.peakWorkingSetBytes[1] ? 0 : 1;
-            const size_t loser = 1 - winner;
-            const auto percentage =
-                static_cast<double>(value.peakWorkingSetBytes[loser] - value.peakWorkingSetBytes[winner]) /
-                static_cast<double>(value.peakWorkingSetBytes[loser]) * 100.0;
-            report << "### **" << upperAscii(markdownText(names[winner])) << " USES " << formatPercent(percentage)
-                   << " LESS RAM**\n\n";
-        }
+            report << "### **" << upperAscii(markdownText(names[comparison.winner])) << " USES "
+                   << formatPercent(comparison.percentLess) << " LESS RAM**\n\n";
     }
 }
 
@@ -516,16 +336,6 @@ static std::string comparisonBar(const double value, const double maximum)
     return result;
 }
 
-static std::string comparisonFactor(const double best, const double worst)
-{
-    if (best <= 0.0 || worst <= 0.0)
-        return "N/A";
-
-    std::ostringstream stream;
-    stream << std::fixed << std::setprecision(2) << worst / best << 'x';
-    return stream.str();
-}
-
 static void writeOverallComparison(std::ostringstream& report, const Config& config, const AggregateResult& value,
                                    const BenchmarkOptions& options)
 {
@@ -537,34 +347,31 @@ static void writeOverallComparison(std::ostringstream& report, const Config& con
     if (options.measureTime)
     {
         const auto maximum = std::max(value.elapsedMilliseconds[0], value.elapsedMilliseconds[1]);
-        const auto winner = value.elapsedMilliseconds[0] < value.elapsedMilliseconds[1] ? 0U : 1U;
-        const auto tie = value.elapsedMilliseconds[0] == value.elapsedMilliseconds[1];
-        const auto factor = comparisonFactor(value.elapsedMilliseconds[winner], maximum);
+        const auto comparison = compareLower(value.elapsedMilliseconds[0], value.elapsedMilliseconds[1]);
+        const auto factor = formatRatio(comparison.factor);
         for (size_t index = 0; index < GroupCount; ++index)
         {
             report << "| Total time | " << markdownText(config.groups[index].name) << " | "
                    << comparisonBar(value.elapsedMilliseconds[index], maximum) << " | "
                    << formatDuration(value.elapsedMilliseconds[index]) << " | "
-                   << (tie ? "1.00x" : (index == winner ? factor : "-")) << " | "
-                   << (tie || index == winner ? "&#128994;" : "") << " |\n";
+                   << (comparison.tie ? "1.00x" : (index == comparison.winner ? factor : "-")) << " | "
+                   << (comparison.tie || index == comparison.winner ? "&#128994;" : "") << " |\n";
         }
     }
     if (options.measureMemory)
     {
         const auto maximum = static_cast<double>(std::max(value.peakWorkingSetBytes[0], value.peakWorkingSetBytes[1]));
-        const auto winner = value.peakWorkingSetBytes[0] < value.peakWorkingSetBytes[1] ? 0U : 1U;
-        const auto tie = value.peakWorkingSetBytes[0] == value.peakWorkingSetBytes[1];
-        const auto improvement =
-            tie || maximum <= 0.0
-                ? 0.0
-                : (maximum - static_cast<double>(value.peakWorkingSetBytes[winner])) / maximum * 100.0;
+        const auto comparison = compareLower(static_cast<double>(value.peakWorkingSetBytes[0]),
+                                             static_cast<double>(value.peakWorkingSetBytes[1]));
         for (size_t index = 0; index < GroupCount; ++index)
         {
             report << "| Highest median RAM | " << markdownText(config.groups[index].name) << " | "
                    << comparisonBar(static_cast<double>(value.peakWorkingSetBytes[index]), maximum) << " | "
                    << formatMiB(value.peakWorkingSetBytes[index]) << " | "
-                   << (tie ? "0.0%" : (index == winner ? formatPercent(improvement) + " less" : "-")) << " | "
-                   << (tie || index == winner ? "&#128994;" : "") << " |\n";
+                   << (comparison.tie
+                           ? "0.0%"
+                           : (index == comparison.winner ? formatPercent(comparison.percentLess) + " less" : "-"))
+                   << " | " << (comparison.tie || index == comparison.winner ? "&#128994;" : "") << " |\n";
         }
     }
     report << '\n';
@@ -578,13 +385,7 @@ static void writeReportOverview(std::ostringstream& report, const Config& config
               "(https://github.com/StefanJohnsen/ProcessBenchmark), version "
            << cmd::VersionNumber << " on " << localReportTime() << " local time.*\n\n<br>\n\n";
     if (results.completed)
-    {
-        std::vector<const FileResult*> files;
-        files.reserve(results.files.size());
-        for (const auto& file : results.files)
-            files.emplace_back(&file);
-        writeOverallPunchline(report, config, calculateAggregate(config, files), options);
-    }
+        writeOverallPunchline(report, config, calculateAggregate(config, results), options);
     writeHardware(report);
     const auto totalPlannedRuns = config.files.size() * config.groups.size() * config.runsPerFile;
     report << "## Benchmark Overview\n\n";
@@ -690,7 +491,7 @@ static void writeFileTypeResults(std::ostringstream& report, const Config& confi
         const auto values = summarizeGroups(config, *file);
         report << "| " << markdownCode(pathToUtf8(pathWithoutExtension(file->file.path.filename()))) << " | "
                << markdownCode(extensionWithoutDot(file->file.extension)) << " | ";
-        if (!comparable(values))
+        if (!isComparable(values))
         {
             if (options.measureTime)
             {
@@ -943,22 +744,4 @@ void writeMarkdownReport(const Config& config, const BenchmarkResults& results, 
     writeAtomic(reportPath, report.str());
 }
 
-size_t comparablePairCount(const Config& config, const BenchmarkResults& results)
-{
-    return static_cast<size_t>(std::count_if(results.files.begin(), results.files.end(), [&](const FileResult& file)
-                                             { return comparable(summarizeGroups(config, file)); }));
-}
-
-bool hasRunFailures(const Config& config, const BenchmarkResults& results)
-{
-    if (!results.fatalError.empty())
-        return true;
-
-    return std::any_of(results.files.begin(), results.files.end(),
-                       [&](const FileResult& file)
-                       {
-                           const auto values = summarizeGroups(config, file);
-                           return values[0].state == ResultState::Invalid || values[1].state == ResultState::Invalid;
-                       });
-}
 } // namespace benchmark
