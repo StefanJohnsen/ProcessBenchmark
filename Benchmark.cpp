@@ -96,6 +96,11 @@ class ConsoleTable final
     void printHeader() const
     {
         printRow(headers_);
+        printSeparator();
+    }
+
+    void printSeparator() const
+    {
         for (size_t index = 0; index < widths_.size(); ++index)
         {
             if (index != 0)
@@ -333,6 +338,8 @@ int runBenchmark(const Config& config, const BenchmarkPlan& plan, const std::fil
                 file.groupRuns[groupIndex].emplace_back(std::move(run));
                 printConsoleRun(consoleTable, config, file, groupIndex, file.groupRuns[groupIndex].back(), options);
             }
+            if (config.runsPerFile >= 2)
+                consoleTable.printSeparator();
         }
     }
 
