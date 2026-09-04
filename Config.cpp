@@ -198,8 +198,10 @@ Config loadConfig(const std::filesystem::path& configPath)
                 throw std::runtime_error(context + " contains duplicate engine '" + values[0] + "'.");
             auto path = absolutePath(values[1], context + " executable");
             requireRegularFile(path, context + " executable");
+#if defined(_WIN32)
             if (lowerAscii(pathToUtf8(path.extension())) != ".exe")
                 throw std::runtime_error(context + " executable must have the .exe extension.");
+#endif
             config.engines.emplace(values[0], std::move(path));
         }
         else if (section == Section::Files)

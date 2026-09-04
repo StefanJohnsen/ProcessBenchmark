@@ -87,14 +87,14 @@ class ThreadAttributeList final
         storage_.resize(byteCount);
         list_ = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage_.data());
         if (!InitializeProcThreadAttributeList(list_, 1, 0, &byteCount))
-            throw std::runtime_error("Could not initialize process attributes: " + windowsErrorMessage(GetLastError()));
+            throw std::runtime_error("Could not initialize process attributes: " + systemErrorMessage(GetLastError()));
 
         if (!UpdateProcThreadAttribute(list_, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
                                        const_cast<HANDLE*>(inheritedHandles.data()),
                                        inheritedHandles.size() * sizeof(HANDLE), nullptr, nullptr))
         {
             throw std::runtime_error("Could not configure inherited process handles: " +
-                                     windowsErrorMessage(GetLastError()));
+                                     systemErrorMessage(GetLastError()));
         }
     }
 
@@ -196,7 +196,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (!nullOutput.valid())
     {
-        result.error = "Could not open the null output device: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not open the null output device: " + systemErrorMessage(GetLastError());
         return result;
     }
 
@@ -204,14 +204,14 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (!nullInput.valid())
     {
-        result.error = "Could not open the null input device: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not open the null input device: " + systemErrorMessage(GetLastError());
         return result;
     }
 
     UniqueHandle job(CreateJobObjectW(nullptr, nullptr));
     if (!job.valid())
     {
-        result.error = "Could not create a process job: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not create a process job: " + systemErrorMessage(GetLastError());
         return result;
     }
 
@@ -219,7 +219,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     if (!SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits)))
     {
-        result.error = "Could not configure the process job: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not configure the process job: " + systemErrorMessage(GetLastError());
         return result;
     }
 
@@ -245,7 +245,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
                        executable.parent_path().c_str(), &startup.StartupInfo, &processInformation);
     if (!created)
     {
-        result.error = "Could not start process: " + windowsErrorMessage(GetLastError());
+        result.error = "Could not start process: " + systemErrorMessage(GetLastError());
         return result;
     }
 
@@ -259,7 +259,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
         const auto error = GetLastError();
         TerminateProcess(process.get(), error);
         WaitForSingleObject(process.get(), INFINITE);
-        result.error = "Could not assign process to the process job: " + windowsErrorMessage(error);
+        result.error = "Could not assign process to the process job: " + systemErrorMessage(error);
         return result;
     }
 
@@ -269,7 +269,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
         const auto error = GetLastError();
         TerminateJobObject(job.get(), error);
         WaitForSingleObject(process.get(), INFINITE);
-        result.error = "Could not resume process: " + windowsErrorMessage(error);
+        result.error = "Could not resume process: " + systemErrorMessage(error);
         return result;
     }
     thread.reset();
@@ -292,7 +292,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
         const auto error = GetLastError();
         TerminateJobObject(job.get(), error);
         WaitForSingleObject(process.get(), INFINITE);
-        appendError(result, "Could not wait for process: " + windowsErrorMessage(error));
+        appendError(result, "Could not wait for process: " + systemErrorMessage(error));
         break;
     }
 
@@ -306,7 +306,7 @@ RunResult runProcess(const std::filesystem::path& executable, const std::string&
     if (GetExitCodeProcess(process.get(), &exitCode))
         result.exitCode = exitCode;
     else
-        appendError(result, "Could not read process exit code: " + windowsErrorMessage(GetLastError()));
+        appendError(result, "Could not read process exit code: " + systemErrorMessage(GetLastError()));
 
     if (!waitForJobToBecomeEmpty(job.get()))
     {

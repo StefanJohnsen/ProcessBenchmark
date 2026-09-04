@@ -1,6 +1,5 @@
 #include "CmdArgs.h"
 
-#include <filesystem>
 #include <stdexcept>
 #include <string>
 
@@ -10,9 +9,9 @@ namespace benchmark::cmd
 {
 namespace
 {
-bool isFlag(const std::wstring& argument, const wchar_t* name)
+bool isFlag(const std::string& argument, const char* name)
 {
-    return argument == std::wstring(L"-") + name || argument == std::wstring(L"--") + name;
+    return argument == std::string("-") + name || argument == std::string("--") + name;
 }
 } // namespace
 
@@ -20,7 +19,7 @@ std::string helpText()
 {
     return "ProcessBenchmark\n\n"
            "Usage:\n"
-           "  ProcessBenchmark.exe [options] \"C:\\full\\path\\processTest.txt\"\n\n"
+           "  ProcessBenchmark [options] \"/full/path/processTest.txt\"\n\n"
            "Options:\n"
            "  -time-only    Measure and report run time only\n"
            "  -ram-only     Measure and report peak RAM only\n"
@@ -32,48 +31,48 @@ std::string helpText()
            "The Markdown report is written beside it with the .md extension.\n";
 }
 
-Arguments parse(const int argc, wchar_t* argv[])
+Arguments parse(const std::vector<std::string>& arguments)
 {
     Arguments result;
     bool timeOnly = false;
     bool ramOnly = false;
     bool noReport = false;
 
-    for (int index = 1; index < argc; ++index)
+    for (size_t index = 1; index < arguments.size(); ++index)
     {
-        const std::wstring argument = argv[index] != nullptr ? argv[index] : L"";
+        const auto& argument = arguments[index];
         if (argument.empty())
             continue;
 
-        if (isFlag(argument, L"help") || argument == L"-h" || argument == L"--h")
+        if (isFlag(argument, "help") || argument == "-h" || argument == "--h")
             result.showHelp = true;
-        else if (isFlag(argument, L"version"))
+        else if (isFlag(argument, "version"))
             result.showVersion = true;
-        else if (isFlag(argument, L"time-only"))
+        else if (isFlag(argument, "time-only"))
         {
             if (timeOnly)
                 throw std::runtime_error("Option -time-only was specified more than once.");
             timeOnly = true;
         }
-        else if (isFlag(argument, L"ram-only"))
+        else if (isFlag(argument, "ram-only"))
         {
             if (ramOnly)
                 throw std::runtime_error("Option -ram-only was specified more than once.");
             ramOnly = true;
         }
-        else if (isFlag(argument, L"noreport"))
+        else if (isFlag(argument, "noreport"))
         {
             if (noReport)
                 throw std::runtime_error("Option -noreport was specified more than once.");
             noReport = true;
         }
-        else if (argument.front() == L'-')
-            throw std::runtime_error("Unknown option " + pathToUtf8(std::filesystem::path(argument)) + ".");
+        else if (argument.front() == '-')
+            throw std::runtime_error("Unknown option " + argument + ".");
         else
         {
             if (!result.configPath.empty())
                 throw std::runtime_error("Only one text configuration path can be specified.");
-            result.configPath = argument;
+            result.configPath = pathFromUtf8(argument);
         }
     }
 

@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 #include "Benchmark.h"
 #include "CmdArgs.h"
@@ -26,7 +27,15 @@ int wmain(const int argc, wchar_t* argv[])
 
     try
     {
-        const auto arguments = benchmark::cmd::parse(argc, argv);
+        std::vector<std::string> rawArguments;
+        rawArguments.reserve(static_cast<size_t>(argc));
+        for (int index = 0; index < argc; ++index)
+        {
+            const auto* value = argv[index] != nullptr ? argv[index] : L"";
+            rawArguments.emplace_back(benchmark::pathToUtf8(std::filesystem::path(value)));
+        }
+
+        const auto arguments = benchmark::cmd::parse(rawArguments);
         if (arguments.showHelp)
         {
             std::cout << benchmark::cmd::helpText();

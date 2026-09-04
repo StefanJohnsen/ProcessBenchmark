@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "Types.h"
 
@@ -21,5 +22,5 @@ struct Arguments final
 };
 
 std::string helpText();
-Arguments parse(int argc, wchar_t* argv[]);
+Arguments parse(const std::vector<std::string>& arguments);
 } // namespace benchmark::cmd

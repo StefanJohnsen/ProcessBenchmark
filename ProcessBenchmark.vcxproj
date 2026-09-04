@@ -56,6 +56,8 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ExceptionHandling>Sync</ExceptionHandling>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)%(RelativeDir)\</ObjectFileName>
       <AdditionalOptions>/Zc:__cplusplus /permissive- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -74,6 +76,8 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ExceptionHandling>Sync</ExceptionHandling>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ObjectFileName>$(IntDir)%(RelativeDir)\</ObjectFileName>
       <AdditionalOptions>/Zc:__cplusplus /permissive- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -89,12 +93,14 @@
     <ClCompile Include="Benchmark.cpp" />
     <ClCompile Include="CmdArgs.cpp" />
     <ClCompile Include="Config.cpp" />
-    <ClCompile Include="Hardware.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="ProcessRunner.cpp" />
+    <ClCompile Include="windows\Hardware.cpp" />
+    <ClCompile Include="windows\main.cpp" />
+    <ClCompile Include="windows\ProcessRunner.cpp" />
     <ClCompile Include="Report.cpp" />
+    <ClCompile Include="windows\Report.cpp" />
     <ClCompile Include="Statistics.cpp" />
     <ClCompile Include="Utility.cpp" />
+    <ClCompile Include="windows\Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Benchmark.h" />
@@ -103,6 +109,7 @@
     <ClInclude Include="CmdArgs.h" />
     <ClInclude Include="ProcessRunner.h" />
     <ClInclude Include="Report.h" />
+    <ClInclude Include="ReportPlatform.h" />
     <ClInclude Include="Statistics.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Utility.h" />

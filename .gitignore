@@ -1,6 +1,7 @@
 .vs/
 .validation/
 x64/
+build/
 *.user
 *.suo
 *.VC.db

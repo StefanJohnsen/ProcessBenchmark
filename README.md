@@ -5,7 +5,7 @@ Which process is faster—and how much RAM does it use?
 `ProcessBenchmark` runs two groups of command-line processes under the same conditions and turns the measurements
 into a clear, reproducible Markdown report.
 
-- Compare any Windows command-line executables.
+- Compare any Windows or Linux command-line executables.
 - Use completely flexible command arguments.
 - Measure run time, peak RAM or both.
 - Run processes sequentially to avoid competition between measured processes.
@@ -21,7 +21,18 @@ into a clear, reproducible Markdown report.
 
 ## Build
 
-Open `ProcessBenchmark.sln` in Visual Studio 2022 and build the `Release | x64` configuration.
+**Windows:** Open `ProcessBenchmark.sln` in Visual Studio 2022 and build the `Release | x64` configuration.
+
+**Linux:** Build with CMake:
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Engine executables and file paths in the configuration must be absolute paths valid on the OS the benchmark runs
+on (for example `C:\...` on Windows or `/usr/...` on Linux) — a configuration is not shared unmodified between
+the two.
 
 <br>
 <br>
