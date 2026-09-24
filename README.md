@@ -224,7 +224,7 @@ Highest median RAM | Test 2 | ████████████████�
 TEST 2 IS 1.11x FASTER
 TEST 1 USES 0.15% LESS RAM
 
-HER MÅ VI LEGGE TIL OGSÅ
+MARKDOWN FILE : /full/path/processTest.md
 ```
 
 ## Report and measurements
@@ -445,4 +445,4 @@ Lower is better. Bars are normalized independently for each metric.
 
 ### **TEST 1 USES 10.0% LESS RAM**
 
-MARKDOWN FILE : C:\benchmarks\config.md
+MARKDOWN FILE : /full/path/processTest.md
