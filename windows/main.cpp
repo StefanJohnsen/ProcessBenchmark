@@ -47,8 +47,12 @@ int wmain(const int argc, wchar_t* argv[])
             return 0;
         }
 
-        const auto& options = arguments.benchmarkOptions;
         const auto config = benchmark::loadConfig(arguments.configPath);
+        auto options = arguments.benchmarkOptions;
+        options.measureTime = config.measureTime;
+        options.measureMemory = config.measureMemory;
+        options.createReport = config.createReport;
+
         const auto plan = benchmark::buildBenchmarkPlan(config);
         const auto reportPath = createReportPath(config.configPath);
 

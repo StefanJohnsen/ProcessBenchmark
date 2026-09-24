@@ -3,6 +3,9 @@
 #include <Windows.h>
 #include <Psapi.h>
 
+#undef max
+#undef min
+
 #include <algorithm>
 #include <chrono>
 #include <cstddef>

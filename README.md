@@ -44,11 +44,12 @@ One readable text file describes the complete benchmark. No scripts or programmi
 Start by copying [`config.example.txt`](config.example.txt), rename the copy to something meaningful such as
 `processTest.txt`, and replace the example values with your own.
 
-You only need to describe three things:
+You only need to describe three things (plus optional measurement settings):
 
 - **Process engines** — the programs you want to test.
 - **Test files** — the common workload used for the comparison.
 - **Process groups** — two alternative ways to process the same files.
+- **Measurements** (optional) — what metrics to collect with `MEASURE TIME` and `MEASURE RAM`.
 
 Rows with the same index belong together. File `0` is used by process `0` in both groups, file `1` by process `1`, and
 so on. This keeps both sides of the comparison synchronized while allowing each group to use different engines,
@@ -60,9 +61,11 @@ arguments and flags.
 2. Set `RUNS` from 1 to 100. Three to five runs normally give a useful comparison because repeated runs reduce the
    influence of a cold first start, background activity and temporary timing variations. The report compares median
    results, so one unusual run has less influence.
-3. Add as many entries as needed under `ENGINES`. Give each executable a short name and its absolute path.
-4. Add the test files under `FILES`, using consecutive indices beginning with `0`.
-5. Add exactly two `PROCESSES` groups. Each group needs one process row for every test file, using matching indices.
+3. Optionally set `MEASURE TIME`, `MEASURE RAM`, and `CREATE REPORT` to control benchmark behavior. All default to `true`.
+   You can also rename `RUNS:` to `RUNS PR. FILE:` for clearer documentation.
+4. Add as many entries as needed under `ENGINES`. Give each executable a short name and its absolute path.
+5. Add the test files under `FILES`, using consecutive indices beginning with `0`.
+6. Add exactly two `PROCESSES` groups. Each group needs one process row for every test file, using matching indices.
 
 ### Command arguments
 
@@ -72,6 +75,29 @@ accepted by the selected executable. The value may also be empty.
 Placeholders are optional. When used, ProcessBenchmark expands them with values from the matching `FILES` row and
 passes the resulting string directly to the executable. It does not interpret or rearrange the command. Use double
 quotes around an individual argument containing spaces.
+
+### Configuration settings
+
+You can optionally control benchmark behavior by adding these parameters to your configuration. All parameters are optional and default to `true`. Use colons for alignment:
+
+**Runs:**
+- `RUNS PR. FILE: 3` — Number of times to run each process (1-100, required)
+
+**Measurements:**
+- `MEASURE TIME: true` — Collect run time (default: `true`)
+- `MEASURE RAM: true` — Collect peak RAM usage (default: `true`)
+- At least one metric must be enabled
+
+**Report:**
+- `CREATE REPORT: true` — Create a Markdown report in the same directory as the config file (default: `true`)
+
+Example:
+```
+RUNS PR. FILE      : 3
+MEASURE TIME       : true
+MEASURE RAM        : true
+CREATE REPORT      : true
+```
 
 ### Good to know
 
@@ -154,9 +180,7 @@ On Linux:
 The report is written beside the configuration file with the same base name. In the Windows example above, the
 report is `C:\Benchmark\processTest.md`.
 
-Use `--time-only` or `--ram-only` to measure one metric. A Markdown report is created by default; use `--noreport`
-when only the console result is needed. These options can be combined. Run with `-help` to see all available
-options.
+Run with `-help` to see all available options.
 
 ```bat
 ProcessBenchmark.exe -help
@@ -169,15 +193,13 @@ Usage:
   ProcessBenchmark [options] "/full/path/processTest.txt"
 
 Options:
-  -time-only    Measure and report run time only
-  -ram-only     Measure and report peak RAM only
-  -noreport     Do not create a Markdown report
   -help         Show this help message
   -version      Show version information
 
-Options also accept the double-dash form, for example --time-only.
 The text configuration path must be absolute.
-The Markdown report is written beside it with the .md extension.
+All configuration is done in the config file, including:
+  - Measurement types (time and RAM) via MEASURE TIME and MEASURE RAM
+  - Report generation via CREATE REPORT
 ```
 
 After the individual runs, the console shows the overall comparison:

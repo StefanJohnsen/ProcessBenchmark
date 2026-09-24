@@ -32,6 +32,9 @@ struct Config final
     std::map<std::string, std::filesystem::path> engines;
     std::vector<std::filesystem::path> files;
     std::vector<ProcessGroup> groups;
+    bool measureTime = true;
+    bool measureMemory = true;
+    bool createReport = true;
 };
 
 struct BenchmarkOptions final

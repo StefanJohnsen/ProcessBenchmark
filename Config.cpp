@@ -146,12 +146,51 @@ Config loadConfig(const std::filesystem::path& configPath)
             config.title = text;
             continue;
         }
-        if (text.rfind("RUNS:", 0) == 0)
+        const auto colonPos = text.find(':');
+        if (colonPos != std::string::npos)
         {
-            config.runsPerFile = parseIndex(trim(text.substr(5)), "RUNS");
-            if (config.runsPerFile < 1 || config.runsPerFile > 100)
-                throw std::runtime_error("RUNS must be between 1 and 100.");
-            continue;
+            const auto paramName = trim(text.substr(0, colonPos));
+            const auto paramValue = trim(text.substr(colonPos + 1));
+            const auto commentPos = paramValue.find('(');
+            const auto value = commentPos != std::string::npos ? trim(paramValue.substr(0, commentPos)) : paramValue;
+
+            if (paramName == "RUNS PR. FILE")
+            {
+                config.runsPerFile = parseIndex(value, "RUNS PR. FILE");
+                if (config.runsPerFile < 1 || config.runsPerFile > 100)
+                    throw std::runtime_error("RUNS PR. FILE must be between 1 and 100.");
+                continue;
+            }
+            if (paramName == "MEASURE TIME")
+            {
+                if (value == "true")
+                    config.measureTime = true;
+                else if (value == "false")
+                    config.measureTime = false;
+                else
+                    throw std::runtime_error("MEASURE TIME must be 'true' or 'false'.");
+                continue;
+            }
+            if (paramName == "MEASURE RAM")
+            {
+                if (value == "true")
+                    config.measureMemory = true;
+                else if (value == "false")
+                    config.measureMemory = false;
+                else
+                    throw std::runtime_error("MEASURE RAM must be 'true' or 'false'.");
+                continue;
+            }
+            if (paramName == "CREATE REPORT")
+            {
+                if (value == "true")
+                    config.createReport = true;
+                else if (value == "false")
+                    config.createReport = false;
+                else
+                    throw std::runtime_error("CREATE REPORT must be 'true' or 'false'.");
+                continue;
+            }
         }
         if (text == "ENGINES")
         {
@@ -228,7 +267,9 @@ Config loadConfig(const std::filesystem::path& configPath)
     }
 
     if (config.runsPerFile == 0)
-        throw std::runtime_error("Configuration is missing RUNS.");
+        throw std::runtime_error("Configuration is missing RUNS PR. FILE.");
+    if (!config.measureTime && !config.measureMemory)
+        throw std::runtime_error("Configuration must measure at least one metric: MEASURE TIME or MEASURE RAM must be true.");
     if (config.engines.empty())
         throw std::runtime_error("ENGINES must contain at least one engine.");
     if (config.files.empty())
