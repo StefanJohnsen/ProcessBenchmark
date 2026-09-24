@@ -96,7 +96,7 @@ Example:
 RUNS PR. FILE      : 3
 MEASURE TIME       : true
 MEASURE RAM        : true
-CREATE REPORT      : true
+CREATE REPORT      : true  (creates benchmark.md in same directory as config file)
 ```
 
 ### Good to know
@@ -114,7 +114,10 @@ CREATE REPORT      : true
 ```text
 PROCESS BENCHMARK EXAMPLE - TEST 1 VS TEST 2
 
-RUNS: 3
+RUNS PR. FILE      : 3
+MEASURE TIME       : true
+MEASURE RAM        : true
+CREATE REPORT      : true  (creates benchmark.md in same directory as config file)
 
 ENGINES
 
