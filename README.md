@@ -442,5 +442,3 @@ Lower is better. Bars are normalized independently for each metric.
 ### **TEST 2 IS 2.07x FASTER**
 
 ### **TEST 1 USES 10.0% LESS RAM**
-
-MARKDOWN FILE : C:\benchmarks\config.md

@@ -628,11 +628,6 @@ static void writeConfigurationUsed(std::ostringstream& report, const Config& con
     report << fence << '\n';
 }
 
-static void writeReportPath(std::ostringstream& report, const std::filesystem::path& reportPath)
-{
-    report << "\n\nMARKDOWN FILE : " << pathToUtf8(reportPath) << '\n';
-}
-
 static void writeAtomic(const std::filesystem::path& reportPath, const std::string& text)
 {
     auto temporary = reportPath;
@@ -682,7 +677,6 @@ void writeMarkdownReport(const Config& config, const BenchmarkResults& results, 
     writeOverallPunchline(report, config, overall, options);
     writeFailures(report, config, results);
     writeConfigurationUsed(report, config);
-    writeReportPath(report, reportPath);
     writeAtomic(reportPath, report.str());
 }
 
