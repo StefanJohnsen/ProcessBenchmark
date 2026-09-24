@@ -66,7 +66,7 @@ int main(const int argc, char* argv[])
         else
             std::cout << "\nBenchmark completed with errors.\n";
         if (options.createReport)
-            std::cout << "Report: " << benchmark::pathToUtf8(reportPath) << '\n';
+            std::cout << "MARKDOWN FILE : " << benchmark::pathToUtf8(reportPath) << '\n';
         return exitCode;
     }
     catch (const std::exception& error)
