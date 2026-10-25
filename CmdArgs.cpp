@@ -19,11 +19,11 @@ std::string helpText()
 {
     return "ProcessBenchmark\n\n"
            "Usage:\n"
-           "  ProcessBenchmark [options] \"/full/path/processTest.txt\"\n\n"
+           "  ProcessBenchmark [options] \"processTest.txt\"\n\n"
            "Options:\n"
            "  -help         Show this help message\n"
            "  -version      Show version information\n\n"
-           "The text configuration path must be absolute.\n"
+           "A relative configuration path is resolved from the current directory.\n"
            "All configuration is done in the config file, including:\n"
            "  - Measurement types (time and RAM) via MEASURE TIME and MEASURE RAM\n"
            "  - Report generation via CREATE REPORT\n";

@@ -74,7 +74,8 @@ accepted by the selected executable. The value may also be empty.
 
 Placeholders are optional. When used, ProcessBenchmark expands them with values from the matching `FILES` row and
 passes the resulting string directly to the executable. It does not interpret or rearrange the command. Use double
-quotes around an individual argument containing spaces.
+quotes around an individual argument containing spaces. This includes `{file}` and the other file
+placeholders: they are inserted as-is, so a file name with spaces must be written as `"{file}"`.
 
 ### Configuration settings
 
@@ -139,17 +140,17 @@ PROCESSES - TEST 1
 
 Index | Engine  | Command Arguments
 ------|---------|--------------------------------------------------------------------------
-0     | EngineA | {file} C:\temp\Test1\{file.name}.obj -async
-1     | EngineA | {file} C:\temp\Test1\{file.name}.obj -async
-2     | EngineB | {file} C:\temp\Test1\{file.name}.obj -async
+0     | EngineA | "{file}" "C:\temp\Test1\{file.name}.obj" -async
+1     | EngineA | "{file}" "C:\temp\Test1\{file.name}.obj" -async
+2     | EngineB | "{file}" "C:\temp\Test1\{file.name}.obj" -async
 
 PROCESSES - TEST 2
 
 Index | Engine  | Command Arguments
 ------|---------|---------------------------------------------------------------------------------
-0     | EngineC | {file} C:\temp\Test2\{file.name}.obj
-1     | EngineC | {file} C:\temp\Test2\{file.name}.obj
-2     | EngineC | {file} C:\temp\Test2\{file.name}.obj
+0     | EngineC | "{file}" "C:\temp\Test2\{file.name}.obj"
+1     | EngineC | "{file}" "C:\temp\Test2\{file.name}.obj"
+2     | EngineC | "{file}" "C:\temp\Test2\{file.name}.obj"
 ```
 
 For illustration, the configuration above produces the same command lines you might place in a batch file:
@@ -168,7 +169,7 @@ order shown: Test 1 followed by Test 2 for each file.
 
 ## Run the benchmark
 
-Give ProcessBenchmark the absolute path to your configuration file:
+Give ProcessBenchmark the path to your configuration file. A relative path is resolved from the current directory:
 
 ```bat
 ProcessBenchmark.exe "C:\Benchmark\processTest.txt"
@@ -193,13 +194,13 @@ ProcessBenchmark.exe -help
 ProcessBenchmark
 
 Usage:
-  ProcessBenchmark [options] "/full/path/processTest.txt"
+  ProcessBenchmark [options] "processTest.txt"
 
 Options:
   -help         Show this help message
   -version      Show version information
 
-The text configuration path must be absolute.
+A relative configuration path is resolved from the current directory.
 All configuration is done in the config file, including:
   - Measurement types (time and RAM) via MEASURE TIME and MEASURE RAM
   - Report generation via CREATE REPORT

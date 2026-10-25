@@ -192,17 +192,17 @@ PROCESSES - TEST 1
 
 Index | Engine  | Command Arguments
 ------|---------|--------------------------------------------------------------------------
-0     | EngineA | {file} C:\temp\Test1\{file.name}.obj -async
-1     | EngineA | {file} C:\temp\Test1\{file.name}.obj -async
-2     | EngineB | {file} C:\temp\Test1\{file.name}.obj -async
+0     | EngineA | "{file}" "C:\temp\Test1\{file.name}.obj" -async
+1     | EngineA | "{file}" "C:\temp\Test1\{file.name}.obj" -async
+2     | EngineB | "{file}" "C:\temp\Test1\{file.name}.obj" -async
 
 PROCESSES - TEST 2
 
 Index | Engine  | Command Arguments
 ------|---------|---------------------------------------------------------------------------------
-0     | EngineC | {file} C:\temp\Test2\{file.name}.obj
-1     | EngineC | {file} C:\temp\Test2\{file.name}.obj
-2     | EngineC | {file} C:\temp\Test2\{file.name}.obj
+0     | EngineC | "{file}" "C:\temp\Test2\{file.name}.obj"
+1     | EngineC | "{file}" "C:\temp\Test2\{file.name}.obj"
+2     | EngineC | "{file}" "C:\temp\Test2\{file.name}.obj"
 
 FILE PLACEHOLDERS (documentation only - not used by the system)
 

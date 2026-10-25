@@ -114,8 +114,6 @@ std::string expandCommandArguments(const std::string& value, const std::filesyst
 
 Config loadConfig(const std::filesystem::path& configPath)
 {
-    if (!configPath.is_absolute())
-        throw std::runtime_error("The text configuration path must be absolute.");
     Config config;
     config.configPath = normalizeAbsolutePath(configPath);
     if (lowerAscii(pathToUtf8(config.configPath.extension())) != ".txt")
